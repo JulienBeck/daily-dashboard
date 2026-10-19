@@ -1,0 +1,777 @@
+<!doctype html>
+<html lang="de" data-season="autumn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daily-Dashboard — Mockup</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --plane: #0d0d0d;
+    --surface: #1a1a19;
+    --card: #222220;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --ink-muted: #898781;
+    --hairline: rgba(255, 255, 255, .10);
+    --rule: #2c2c2a;
+
+    --good: #0ca30c;
+    --warning: #fab219;
+    --serious: #ec835a;
+    --critical: #d03b3b;
+    --running: #898781;
+    --idle: #898781;
+
+    --step-1: #c3c2b7;
+    --step-2: #898781;
+    --step-3: #52514e;
+
+    --gap: 12px;
+    --radius: 10px;
+  }
+
+  [data-season="spring"] { --accent: #199e70; --season-label: "Frühling"; }
+  [data-season="summer"] { --accent: #eda100; --season-label: "Sommer"; }
+  [data-season="autumn"] { --accent: #d95926; --season-label: "Herbst"; }
+  [data-season="winter"] { --accent: #3987e5; --season-label: "Winter"; }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--plane);
+    color: var(--ink);
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(1400px 700px at 50% -20%, color-mix(in oklab, var(--accent) 8%, transparent), transparent 70%),
+      radial-gradient(900px 500px at 100% 110%, color-mix(in oklab, var(--accent) 5%, transparent), transparent 70%);
+    transition: background .6s ease;
+  }
+
+  .board {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap);
+    height: 100vh;
+    padding: var(--gap);
+  }
+
+  .board > header.topbar,
+  .board > .reminder,
+  .board > .ampel { flex: none; }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    min-height: 0;
+  }
+
+  .panel-h {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    font-size: 11px;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .panel--accent { border-top: 2px solid var(--accent); }
+
+  header.topbar {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 24px;
+    padding: 10px 16px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius);
+  }
+
+  .season {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 20px;
+    font-weight: 600;
+  }
+
+  .season .blob {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 22%, transparent);
+  }
+
+  .season .name::after { content: var(--season-label); }
+
+  .sub { font-size: 12px; color: var(--ink-muted); font-weight: 400; }
+
+  .now { text-align: center; }
+  .now .time { font-size: 30px; font-weight: 600; letter-spacing: -.02em; }
+  .now .date { font-size: 12px; color: var(--ink-2); }
+
+  .next { text-align: right; font-size: 12px; color: var(--ink-muted); line-height: 1.5; }
+  .next b { color: var(--ink-2); font-weight: 600; }
+
+  .reminder {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    border-radius: var(--radius);
+    border: 1px solid color-mix(in oklab, var(--accent) 45%, transparent);
+    background: color-mix(in oklab, var(--accent) 12%, var(--surface));
+    font-size: 14px;
+  }
+
+  .reminder[hidden] { display: none; }
+  .reminder .mark { color: var(--accent); font-size: 16px; }
+  .reminder .grow { flex: 1; }
+  .reminder .count { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+  .reminder button {
+    font: inherit;
+    font-size: 12px;
+    color: var(--ink-muted);
+    background: none;
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    padding: 3px 10px;
+    cursor: pointer;
+  }
+
+  .reminder button:hover { color: var(--ink); border-color: var(--ink-muted); }
+
+  .ampel {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 18px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+  }
+
+  .tally { display: flex; align-items: center; gap: 14px; }
+
+  .tally .t {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    font-size: 22px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tally .t span { font-size: 13px; font-weight: 600; }
+  .tally .t.good { color: var(--good); }
+  .tally .t.warning { color: var(--warning); }
+  .tally .t.critical { color: var(--critical); }
+  .tally .t.running { color: var(--running); }
+  .tally .t.idle { color: var(--idle); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    line-height: 1;
+    padding: 5px 8px 5px 6px;
+    border-radius: 999px;
+    border: 1px solid var(--hairline);
+    background: var(--card);
+    color: var(--ink-2);
+    cursor: default;
+  }
+
+  .chip .g {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 9px;
+    font-weight: 700;
+    color: #0d0d0d;
+    flex: none;
+  }
+
+  .chip.good .g { background: var(--good); }
+  .chip.warning .g { background: var(--warning); }
+  .chip.critical .g { background: var(--critical); }
+  .chip.idle .g { background: var(--idle); }
+  .chip.running .g { background: var(--running); color: var(--ink); animation: pulse 1.6s ease-in-out infinite; }
+  .chip.running { border-style: dashed; }
+  .chip.critical { border-color: color-mix(in oklab, var(--critical) 55%, transparent); color: var(--ink); }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--running) 60%, transparent); }
+    50% { box-shadow: 0 0 0 4px color-mix(in oklab, var(--running) 0%, transparent); }
+  }
+
+  .legend { display: flex; gap: 12px; font-size: 10px; color: var(--ink-muted); }
+  .legend i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+
+  main.grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 3fr 6fr 3fr;
+    gap: var(--gap);
+    min-height: 0;
+  }
+
+  .col { display: grid; gap: var(--gap); min-height: 0; }
+  .col.left { grid-template-rows: auto 1fr; }
+  .col.right { grid-template-rows: 1fr auto; }
+
+  .hero { display: flex; align-items: baseline; gap: 8px; }
+  .hero .n { font-size: 52px; font-weight: 700; letter-spacing: -.03em; line-height: 1; }
+  .hero .u { font-size: 13px; color: var(--ink-2); }
+
+  .stack { display: flex; gap: 2px; height: 14px; margin: 16px 0 10px; }
+  .stack div { height: 100%; }
+  .stack div:first-child { border-radius: 4px 0 0 4px; }
+  .stack div:last-child { border-radius: 0 4px 4px 0; }
+
+  .stack-key { display: grid; gap: 6px; font-size: 12px; }
+  .stack-key div { display: flex; align-items: center; gap: 8px; color: var(--ink-2); }
+  .stack-key i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .stack-key b { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--ink); }
+
+  .people { display: grid; gap: 8px; font-size: 13px; align-content: start; }
+  .person { display: flex; align-items: center; gap: 9px; color: var(--ink-2); }
+
+  .av {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 10px;
+    font-weight: 700;
+    background: var(--card);
+    border: 1px solid var(--hairline);
+    color: var(--ink-2);
+    flex: none;
+  }
+
+  .person.away { color: var(--ink-muted); }
+  .person.away .av { opacity: .45; }
+  .person .tag { margin-left: auto; font-size: 11px; color: var(--ink-muted); }
+
+  .kanban { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; min-height: 0; }
+  .lane { display: grid; grid-template-rows: auto 1fr; min-height: 0; }
+
+  .lane-h {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 8px;
+  }
+
+  .lane-h .cnt {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--ink-2);
+    background: var(--card);
+    border-radius: 999px;
+    padding: 1px 7px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cards { display: grid; gap: 8px; align-content: start; overflow: hidden; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--hairline);
+    border-left: 2px solid var(--accent);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+
+  .card .k {
+    font-size: 10px;
+    letter-spacing: .06em;
+    color: var(--accent);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .card .s { font-size: 13px; line-height: 1.35; margin: 3px 0 7px; }
+  .card .m { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--ink-muted); }
+  .card .pts { margin-left: auto; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .card.flagged { border-left-color: var(--critical); }
+  .card.flagged .k { color: var(--critical); }
+  .card.done { opacity: .55; border-left-color: var(--rule); }
+  .card.done .k { color: var(--ink-muted); }
+
+  .mrs { display: grid; gap: 7px; align-content: start; overflow: hidden; font-size: 12px; }
+
+  .mr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 10px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .mr:last-child { border-bottom: 0; }
+  .mr .t { grid-column: 1; color: var(--ink); line-height: 1.3; }
+  .mr .age { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-variant-numeric: tabular-nums; color: var(--ink-muted); white-space: nowrap; }
+  .mr .meta { grid-column: 1; font-size: 11px; color: var(--ink-muted); }
+  .mr.old .age { color: var(--serious); font-weight: 600; }
+
+  .timer { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 14px; }
+
+  .ring {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: conic-gradient(var(--accent) calc(var(--p) * 1%), var(--rule) 0);
+    position: relative;
+  }
+
+  .ring::after {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    background: var(--surface);
+  }
+
+  .ring span { position: relative; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .timer .lbl { font-size: 12px; color: var(--ink-muted); }
+  .timer .hint { font-size: 11px; color: var(--ink-muted); margin-top: 4px; }
+  .timer button { font: inherit; font-size: 12px; margin-top: 6px; padding: 4px 12px; border-radius: 6px; border: 1px solid var(--hairline); background: var(--card); color: var(--ink-2); cursor: pointer; }
+  .timer button:hover { color: var(--ink); border-color: var(--accent); }
+
+  .stale { font-size: 10px; color: var(--warning); letter-spacing: .04em; }
+
+  #tip {
+    position: fixed;
+    z-index: 9;
+    max-width: 320px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #000;
+    border: 1px solid var(--hairline);
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--ink-2);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .12s;
+  }
+
+  #tip b { color: var(--ink); display: block; font-size: 12px; }
+  #tip.on { opacity: 1; }
+
+  .keys {
+    position: fixed;
+    left: 14px;
+    bottom: 12px;
+    font-size: 10px;
+    color: var(--ink-muted);
+    background: color-mix(in oklab, var(--surface) 90%, transparent);
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    padding: 5px 9px;
+  }
+
+  .keys kbd {
+    font: inherit;
+    background: var(--card);
+    border: 1px solid var(--hairline);
+    border-radius: 3px;
+    padding: 0 4px;
+    color: var(--ink-2);
+  }
+</style>
+</head>
+<body data-palette="#199e70,#eda100,#d95926,#3987e5" data-mode="dark" data-surface="#1a1a19" data-pairs="all">
+
+<div class="board">
+
+  <header class="topbar">
+    <div class="season">
+      <span class="blob"></span>
+      <span>
+        <span class="name"></span>
+        <span class="sub" id="seasonSpan"></span>
+      </span>
+    </div>
+    <div class="now">
+      <div class="time" id="clock">09:14</div>
+      <div class="date" id="today"></div>
+    </div>
+    <div class="next" id="nextChange"></div>
+  </header>
+
+  <div class="reminder" id="reminder" hidden>
+    <span class="mark">◆</span>
+    <span class="grow">Nächstes Theme planen — <b id="remSeason">Winter</b> startet in <span class="count" id="remDays">13</span> Tagen.</span>
+    <button id="remDismiss">Heute ausblenden</button>
+  </div>
+
+  <section class="ampel">
+    <div class="tally" id="tally"></div>
+    <div class="chips" id="chips"></div>
+    <div class="legend">
+      <span><i style="background:var(--good)"></i>grün</span>
+      <span><i style="background:var(--warning)"></i>gelb</span>
+      <span><i style="background:var(--critical)"></i>rot</span>
+      <span><i style="background:var(--running)"></i>läuft (pulsiert)</span>
+      <span><i style="background:var(--idle)"></i>ruhend</span>
+    </div>
+  </section>
+
+  <main class="grid">
+
+    <div class="col left">
+      <div class="panel panel--accent">
+        <div class="panel-h"><span>Sprint 42</span><span>bis 30.10.</span></div>
+        <div class="hero"><span class="n">6</span><span class="u">Arbeitstage übrig</span></div>
+        <div class="stack">
+          <div style="background:var(--step-1); width:52%"></div>
+          <div style="background:var(--step-2); width:28%"></div>
+          <div style="background:var(--step-3); width:20%"></div>
+        </div>
+        <div class="stack-key">
+          <div><i style="background:var(--step-1)"></i>erledigt<b>34 P</b></div>
+          <div><i style="background:var(--step-2)"></i>in Arbeit<b>18 P</b></div>
+          <div><i style="background:var(--step-3)"></i>offen<b>13 P</b></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h"><span>Heute im Daily</span><span>4 / 6</span></div>
+        <div class="people" id="people"></div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="panel panel--accent" style="display:grid; grid-template-rows:auto 1fr; min-height:0">
+        <div class="panel-h"><span>Stories im Sprint</span><span id="storyCount"></span></div>
+        <div class="kanban" id="kanban"></div>
+      </div>
+    </div>
+
+    <div class="col right">
+      <div class="panel" style="display:grid; grid-template-rows:auto 1fr; min-height:0">
+        <div class="panel-h"><span>Merge Requests</span><span class="stale">Stand 2 Min alt</span></div>
+        <div class="mrs" id="mrs"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h"><span>Timebox</span><span>15 Minuten</span></div>
+        <div class="timer">
+          <div class="ring" id="ring" style="--p:0"><span id="ringText">15:00</span></div>
+          <div>
+            <div class="lbl">Daily-Timer</div>
+            <button id="timerBtn">Start</button>
+            <div class="hint">Leertaste startet und pausiert</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div id="tip"></div>
+
+<div class="keys">
+  <kbd>1</kbd>–<kbd>4</kbd> Jahreszeit · <kbd>0</kbd> automatisch · <kbd>r</kbd> Erinnerung · <kbd>Leer</kbd> Timer
+</div>
+
+<script type="module" src="./validate_palette.js"></script>
+<script>
+const SEASONS = [
+  { key: 'winter', label: 'Winter', start: 12, span: 'Dez – Feb' },
+  { key: 'spring', label: 'Frühling', start: 3, span: 'Mrz – Mai' },
+  { key: 'summer', label: 'Sommer', start: 6, span: 'Jun – Aug' },
+  { key: 'autumn', label: 'Herbst', start: 9, span: 'Sep – Nov' }
+];
+
+const seasonFor = date => {
+  const m = date.getMonth() + 1;
+  if (m >= 3 && m <= 5) return SEASONS[1];
+  if (m >= 6 && m <= 8) return SEASONS[2];
+  if (m >= 9 && m <= 11) return SEASONS[3];
+  return SEASONS[0];
+};
+
+const nextSeasonStart = date => {
+  const y = date.getFullYear();
+  const m = date.getMonth() + 1;
+  const next = Math.ceil((m + 1) / 3) * 3;
+  return next > 12 ? new Date(y + 1, 2, 1) : new Date(y, next - 1, 1);
+};
+
+const daysUntil = (from, to) =>
+  Math.round((Date.UTC(to.getFullYear(), to.getMonth(), to.getDate())
+    - Date.UTC(from.getFullYear(), from.getMonth(), from.getDate())) / 86400000);
+
+const reminderActive = date => {
+  const start = nextSeasonStart(date);
+  const lead = new Date(start.getFullYear(), start.getMonth() - 1, 1);
+  return date >= lead;
+};
+
+const PIPELINES = [
+  { p: 'fe/ki/ki-backend', ref: 'master', s: 'failed', ago: '14 Min', by: 'A. Hartmann', job: 'test' },
+  { p: 'fe/ki/ai-chat', ref: 'master', s: 'running', ago: 'läuft', by: 'J. Beck', job: 'build' },
+  { p: 'fe/ki/ki-helm-chart-on-prem', ref: 'master', s: 'success', ago: '2 Std', by: 'J. Beck', job: '—' },
+  { p: 'fe/ki/ki-backend-billing', ref: 'master', s: 'success', ago: '5 Std', by: 'M. Roth', job: '—' },
+  { p: 'fe/ki/ki-backend-billing-api', ref: 'master', s: 'success', ago: '5 Std', by: 'M. Roth', job: '—' },
+  { p: 'fe/ki/ceyoniq-credit-service', ref: 'master', s: 'canceled', ago: '1 Std', by: 'S. Kern', job: 'publish' },
+  { p: 'fe/ki/billing-ui', ref: 'master', s: 'success', ago: '1 Tag', by: 'M. Roth', job: '—' },
+  { p: 'fe/ki/ccs-ui', ref: 'master', s: 'success', ago: '1 Tag', by: 'S. Kern', job: '—' },
+  { p: 'fe/ki/ki-application-creator', ref: 'master', s: 'success', ago: '3 Tage', by: 'A. Hartmann', job: '—' },
+  { p: 'fe/ki/ki-statistics', ref: 'master', s: 'success', ago: '4 Tage', by: 'S. Kern', job: '—' },
+  { p: 'fe/ki/ki-on-prem-installer', ref: 'master', s: 'success', ago: '6 Std', by: 'J. Beck', job: '—' },
+  { p: 'fe/ki/zitadeloauthtokenrequester', ref: 'master', s: 'success', ago: '9 Tage', by: 'A. Hartmann', job: '—' },
+  { p: 'fe/ki/ai-docu', ref: 'master', s: 'success', ago: '2 Tage', by: 'J. Beck', job: '—' },
+  { p: 'fe/ki/ai-ci-jobs', ref: 'main', s: 'success', ago: '11 Tage', by: 'J. Beck', job: '—' },
+  { p: 'fe/ki/stack-it-zero-scaler', ref: 'master', s: 'stale', ago: '87 Tage', by: 'A. Hartmann', job: '—' },
+  { p: 'fe/nappl/application-layer', ref: 'master', s: 'success', ago: '3 Std', by: 'T. Weber', job: '—' },
+  { p: 'fe/nappl/applicationlayer-mcp-server', ref: 'master', s: 'manual', ago: '2 Tage', by: 'T. Weber', job: 'deploy' }
+];
+
+const STATUS = {
+  failed:   { c: 'critical', g: '✕', label: 'fehlgeschlagen' },
+  canceled: { c: 'warning',  g: '!', label: 'abgebrochen' },
+  manual:   { c: 'warning',  g: '!', label: 'wartet auf manuellen Job' },
+  running:  { c: 'running',  g: '↻', label: 'läuft gerade' },
+  success:  { c: 'good',     g: '✓', label: 'erfolgreich' },
+  stale:    { c: 'idle',     g: '–', label: 'keine frische Pipeline' }
+};
+
+const ORDER = ['critical', 'warning', 'running', 'idle', 'good'];
+const short = path => path.split('/').pop();
+
+function renderAmpel() {
+  const rows = PIPELINES.map(r => ({ ...r, st: STATUS[r.s] }))
+    .sort((a, b) => ORDER.indexOf(a.st.c) - ORDER.indexOf(b.st.c));
+
+  const counts = {};
+  rows.forEach(r => counts[r.st.c] = (counts[r.st.c] || 0) + 1);
+
+  const tally = [
+    ['good', '✓'], ['warning', '!'], ['critical', '✕'], ['running', '↻'], ['idle', '–']
+  ].filter(([c]) => counts[c])
+    .map(([c, g]) => `<div class="t ${c}">${counts[c]}<span>${g}</span></div>`)
+    .join('');
+  document.getElementById('tally').innerHTML = tally;
+
+  document.getElementById('chips').innerHTML = rows.map(r =>
+    `<span class="chip ${r.st.c}" data-tip="${r.p}|${r.st.label} · ${r.ref} · ${r.ago}${r.job !== '—' ? ' · Job ' + r.job : ''} · ${r.by}">`
+    + `<span class="g">${r.st.g}</span>${short(r.p)}</span>`
+  ).join('');
+}
+
+const STORIES = {
+  'To Do': [
+    { k: 'KI-612', s: 'Mehrere Replikas des KI-Backends absichern', a: 'AH', p: 8 },
+    { k: 'KI-618', s: 'Statistik bricht ab der zweiten Replika ab', a: 'SK', p: 5, flag: true },
+    { k: 'KI-621', s: 'Chart-Werte für den Erstkunden dokumentieren', a: 'JB', p: 3 }
+  ],
+  'In Arbeit': [
+    { k: 'KI-604', s: 'AL-Metadaten im Chat auswerten', a: 'TW', p: 8 },
+    { k: 'KI-609', s: 'SBOM auf Produktebene zusammenführen', a: 'JB', p: 5 },
+    { k: 'KI-615', s: 'Zusammenfassung ohne secretKey-Header prüfen', a: 'MR', p: 5 }
+  ],
+  'Erledigt': [
+    { k: 'KI-588', s: 'Installer-Tests unter Windows grün', a: 'JB', p: 8 },
+    { k: 'KI-596', s: 'Dev-Images in eigenen Pfad verschieben', a: 'AH', p: 5 },
+    { k: 'KI-601', s: 'Caddyfile um /ai/chat ergänzen', a: 'SK', p: 3 },
+    { k: 'KI-602', s: 'Guthabenanzeige rundet falsch', a: 'MR', p: 3 }
+  ]
+};
+
+function renderStories() {
+  const total = Object.values(STORIES).flat().length;
+  document.getElementById('storyCount').textContent = total + ' Vorgänge · 65 Punkte';
+  document.getElementById('kanban').innerHTML = Object.entries(STORIES).map(([lane, items]) => `
+    <div class="lane">
+      <div class="lane-h">${lane}<span class="cnt">${items.length}</span></div>
+      <div class="cards">${items.map(i => `
+        <div class="card ${i.flag ? 'flagged' : ''} ${lane === 'Erledigt' ? 'done' : ''}">
+          <div class="k">${i.k}${i.flag ? ' ⚑' : ''}</div>
+          <div class="s">${i.s}</div>
+          <div class="m"><span class="av">${i.a}</span><span class="pts">${i.p} P</span></div>
+        </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+const MRS = [
+  { t: 'Replika-sichere Statistik', p: 'ki-backend', who: 'A. Hartmann', d: 12, old: true },
+  { t: 'Caddyfile: /ai/chat weiterleiten', p: 'ki-on-prem-installer', who: 'S. Kern', d: 6, old: true },
+  { t: 'Dev-Images in nscale-ai-dev', p: 'ki-helm-chart-on-prem', who: 'J. Beck', d: 3 },
+  { t: 'Metadaten aus AL 10.3 lesen', p: 'application-layer', who: 'T. Weber', d: 2 },
+  { t: 'Guthaben korrekt runden', p: 'ccs-ui', who: 'M. Roth', d: 1 }
+];
+
+function renderMrs() {
+  document.getElementById('mrs').innerHTML = MRS.map(m => `
+    <div class="mr ${m.old ? 'old' : ''}">
+      <div class="t">${m.t}</div>
+      <div class="meta">${m.p} · ${m.who}</div>
+      <div class="age">${m.d} T</div>
+    </div>`).join('');
+}
+
+const TEAM = [
+  { n: 'J. Beck', i: 'JB' },
+  { n: 'A. Hartmann', i: 'AH' },
+  { n: 'S. Kern', i: 'SK' },
+  { n: 'M. Roth', i: 'MR' },
+  { n: 'T. Weber', i: 'TW', away: 'Urlaub bis 24.10.' },
+  { n: 'L. Dorn', i: 'LD', away: 'Schulung' }
+];
+
+function renderPeople() {
+  document.getElementById('people').innerHTML = TEAM.map(p => `
+    <div class="person ${p.away ? 'away' : ''}">
+      <span class="av">${p.i}</span>${p.n}
+      ${p.away ? `<span class="tag">${p.away}</span>` : ''}
+    </div>`).join('');
+}
+
+let forced = null;
+
+function virtualToday() {
+  if (!forced) return new Date();
+  const s = SEASONS.find(x => x.key === forced);
+  const end = (s.start + 2) > 12 ? s.start - 10 : s.start + 2;
+  const y = new Date().getFullYear() + (s.start === 12 ? 1 : 0);
+  return new Date(y, end - 1, 20);
+}
+
+function renderSeason() {
+  const now = virtualToday();
+  const season = forced ? SEASONS.find(s => s.key === forced) : seasonFor(now);
+  document.documentElement.dataset.season = season.key;
+  document.getElementById('seasonSpan').textContent = season.span + (forced ? ' · Vorschau' : '');
+
+  const start = nextSeasonStart(now);
+  const next = SEASONS.find(s => s.start === start.getMonth() + 1);
+  const days = daysUntil(now, start);
+  document.getElementById('nextChange').innerHTML =
+    `${forced ? 'Vorschau — ' : ''}nächster Wechsel zu <b>${next.label}</b><br>am ${start.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' })} · in ${days} Tagen`;
+  document.getElementById('remSeason').textContent = next.label;
+  document.getElementById('remDays').textContent = days;
+
+  if (remForced === null) document.getElementById('reminder').hidden = !reminderActive(now);
+  else document.getElementById('reminder').hidden = !remForced;
+
+  document.getElementById('today').textContent =
+    new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+let remForced = null;
+
+function tickClock() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+
+let left = 900, running = false;
+
+function renderTimer() {
+  const m = String(Math.floor(left / 60)).padStart(2, '0');
+  const s = String(left % 60).padStart(2, '0');
+  document.getElementById('ringText').textContent = `${m}:${s}`;
+  document.getElementById('ring').style.setProperty('--p', (900 - left) / 9);
+  document.getElementById('timerBtn').textContent = running ? 'Pause' : (left === 900 ? 'Start' : 'Weiter');
+}
+
+function toggleTimer() {
+  running = !running;
+  renderTimer();
+}
+
+setInterval(() => {
+  tickClock();
+  if (running && left > 0) { left--; renderTimer(); }
+}, 1000);
+
+const tip = document.getElementById('tip');
+
+document.addEventListener('mouseover', e => {
+  const el = e.target.closest('[data-tip]');
+  if (!el) return;
+  const [head, body] = el.dataset.tip.split('|');
+  tip.innerHTML = `<b>${head}</b>${body}`;
+  tip.classList.add('on');
+});
+
+document.addEventListener('mousemove', e => {
+  if (!tip.classList.contains('on')) return;
+  const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8);
+  tip.style.left = x + 'px';
+  tip.style.top = (e.clientY + 18) + 'px';
+});
+
+document.addEventListener('mouseout', e => {
+  if (e.target.closest('[data-tip]')) tip.classList.remove('on');
+});
+
+document.addEventListener('keydown', e => {
+  const map = { '1': 'spring', '2': 'summer', '3': 'autumn', '4': 'winter' };
+  if (map[e.key]) { forced = map[e.key]; renderSeason(); }
+  else if (e.key === '0') { forced = null; remForced = null; renderSeason(); }
+  else if (e.key === 'r') { remForced = document.getElementById('reminder').hidden; renderSeason(); }
+  else if (e.code === 'Space') { e.preventDefault(); toggleTimer(); }
+});
+
+document.getElementById('timerBtn').addEventListener('click', toggleTimer);
+document.getElementById('remDismiss').addEventListener('click', () => {
+  remForced = false;
+  renderSeason();
+});
+
+const param = new URLSearchParams(location.search).get('season');
+if (SEASONS.some(s => s.key === param)) forced = param;
+
+renderAmpel();
+renderStories();
+renderMrs();
+renderPeople();
+renderSeason();
+tickClock();
+renderTimer();
+</script>
+</body>
+</html>

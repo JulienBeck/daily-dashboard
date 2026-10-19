@@ -1,0 +1,64 @@
+{
+  "gitlab": {
+    "baseUrl": "https://source.ceyoniq.com",
+    "groups": ["ceyoniq/fe/ki"],
+    "includeSubgroups": true,
+    "exclude": [
+      "ceyoniq/fe/ki/ki-helm-chart",
+      "ceyoniq/fe/ki/oobabooga*",
+      "ceyoniq/fe/ki/ki-nappl-prod",
+      "ceyoniq/fe/ki/embedding",
+      "ceyoniq/fe/ki/vllm-stack",
+      "ceyoniq/fe/ki/ai-ci-jobs",
+      "ceyoniq/fe/ki/ai-docu",
+      "ceyoniq/fe/ki/helm-git-publisher",
+      "ceyoniq/fe/ki/ki-backend-client",
+      "ceyoniq/fe/ki/ki-cluster",
+      "ceyoniq/fe/ki/stack-it-sdk",
+      "ceyoniq/fe/ki/stack-it-zero-scaler",
+      "ceyoniq/fe/ki/zitadel-api-client",
+      "ceyoniq/fe/ki/zitadeloauthtokenrequester"
+    ],
+    "staleAfterDays": 14,
+    "includeArchived": false,
+    "hideWithoutPipeline": true,
+    "forceGood": []
+  },
+  "jira": {
+    "baseUrl": "https://devtickets.ceyoniq.com",
+    "flavor": "server",
+    "boardId": 253,
+    "jql": null,
+    "storyPointsField": null,
+    "doneStatusCategories": ["done"],
+    "doingStatusCategories": ["indeterminate"],
+    "weekComponents": ["Woche 1", "Woche 2"],
+    "epicsBoardId": 96,
+    "epicsJql": "project = PRO AND issuetype = Epic AND component = \"nscale AI\" AND statusCategory = \"In Progress\" ORDER BY Rank DESC",
+    "epicsStatusCategories": ["indeterminate"],
+    "epicsLimit": 4
+  },
+  "theme": {
+    "reminderLeadMonths": 1
+  },
+  "team": [
+    { "name": "Julien", "away": null, "gitlabUser": true },
+    { "name": "Timo", "away": null, "gitlabUser": false },
+    { "name": "Daniel", "away": null, "gitlabUser": false },
+    { "name": "Saverio", "away": null, "gitlabUser": false }
+  ],
+  "calendar": {
+    "sources": [{ "member": "J. Beck", "env": "CALENDAR_ICS_URL", "own": true }],
+    "absenceKeywords": ["urlaub", "abwesend", "frei", "krank", "ooo", "out of office"]
+  },
+  "activity": {
+    "days": 1,
+    "perMember": 5
+  },
+  "refreshSeconds": 60,
+  "cacheSeconds": {
+    "gitlab": 60,
+    "jira": 120,
+    "calendar": 300
+  }
+}

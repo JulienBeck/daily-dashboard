@@ -1,0 +1,21 @@
+FROM node:24-alpine AS build
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm ci
+COPY tsconfig*.json vite.config.ts index.html ./
+COPY src ./src
+COPY pics ./pics
+# BASE_PATH lets the same image hang under a sub path later (e.g. /daily).
+ARG BASE_PATH=/
+ENV BASE_PATH=${BASE_PATH}
+RUN npx tsc -b tsconfig.app.json && npx vite build
+
+FROM nginx:1.27-alpine
+# envsubst lives in gettext; the base image does not ship it.
+RUN apk add --no-cache gettext
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/templates/nginx.conf
+COPY startnginx.sh /startnginx.sh
+RUN chmod +x /startnginx.sh
+EXPOSE 8080
+CMD ["/startnginx.sh"]

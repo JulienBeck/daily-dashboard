@@ -1,0 +1,27 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    environment:
+      # Tokens come from .env next to this file and stay inside the container.
+      GITLAB_TOKEN: ${GITLAB_TOKEN:?GITLAB_TOKEN fehlt - .env.example kopieren}
+      JIRA_TOKEN: ${JIRA_TOKEN:-}
+      JIRA_EMAIL: ${JIRA_EMAIL:-}
+      DASHBOARD_CONFIG: /config/dashboard.config.json
+    volumes:
+      # Mounted, not baked in: edit the file and restart, no rebuild.
+      - ./dashboard.config.json:/config/dashboard.config.json:ro
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    environment:
+      API_UPSTREAM: api:3399
+    ports:
+      - '8088:8080'
+    depends_on:
+      - api
+    restart: unless-stopped
