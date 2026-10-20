@@ -13,6 +13,7 @@ import {
   fetchTeamAvatars,
   initialsOf,
   pickUser,
+  queriesFor,
   userSearchPath,
   isIssueKey,
   isLane,
@@ -372,26 +373,69 @@ describe('userSearchPath', () => {
 describe('pickUser', () => {
   const user = (name: string, displayName: string) => ({ name, displayName })
 
-  it('trusts the first hit when the member pinned a jira user', () => {
-    expect(pickUser([user('a', 'Anna'), user('b', 'Bert')], 'a', true)?.name).toBe('a')
+  it('takes the only hit when the search was unambiguous', () => {
+    expect(pickUser([user('t.weber', 'Timo Weber')], 'Timo')?.name).toBe('t.weber')
   })
 
-  it('takes the only hit when a plain name is unambiguous', () => {
-    expect(pickUser([user('t.weber', 'Timo Weber')], 'Timo', false)?.name).toBe('t.weber')
+  it('prefers the exact username over the other hits', () => {
+    const picked = pickUser([user('t.weber2', 'Timo W.'), user('t.weber', 'Timo Weber')], 't.weber')
+    expect(picked?.name).toBe('t.weber')
   })
 
   it('prefers the exact display name over the other hits', () => {
-    const picked = pickUser([user('a', 'Timo Weber'), user('b', 'Timo')], 'Timo', false)
-    expect(picked?.name).toBe('b')
+    expect(pickUser([user('a', 'Timo Weber'), user('b', 'Timo')], 'Timo')?.name).toBe('b')
+  })
+
+  it('matches the mail address jira reports, not only the name', () => {
+    const picked = pickUser(
+      [
+        { name: 'tkern', displayName: 'Timo Kern' },
+        { name: 'tweb', displayName: 'Timotheus W.', emailAddress: 't.weber@example.com' },
+      ],
+      't.weber@example.com',
+    )
+    expect(picked?.name).toBe('tweb')
+  })
+
+  it('ignores case and stray spaces', () => {
+    expect(pickUser([user('a', 'Timo Weber'), user('b', ' TIMO ')], 'timo')?.name).toBe('b')
   })
 
   it('shows nobody rather than the wrong face when a first name is ambiguous', () => {
-    expect(pickUser([user('a', 'Timo Weber'), user('b', 'Timo Kern')], 'Timo', false)).toBeNull()
+    expect(pickUser([user('a', 'Timo Weber'), user('b', 'Timo Kern')], 'Timo')).toBeNull()
+  })
+
+  it('shows nobody when two people carry the same exact name', () => {
+    expect(pickUser([user('a', 'Timo'), user('b', 'Timo')], 'Timo')).toBeNull()
   })
 
   it('returns null when the search found nobody', () => {
-    expect(pickUser([], 'Timo', false)).toBeNull()
-    expect(pickUser([], 'timo', true)).toBeNull()
+    expect(pickUser([], 'Timo')).toBeNull()
+  })
+})
+
+describe('queriesFor', () => {
+  it('tries the address first, then its local part, then the name', () => {
+    expect(queriesFor({ name: 'Timo', email: 'T.Krause@ceyoniq.com' })).toEqual([
+      'T.Krause@ceyoniq.com',
+      'T.Krause',
+      'Timo',
+    ])
+  })
+
+  it('asks for the name alone when no address is configured', () => {
+    expect(queriesFor({ name: 'Timo', email: null })).toEqual(['Timo'])
+  })
+
+  it('never asks the same thing twice', () => {
+    expect(queriesFor({ name: 'T.Krause', email: 'T.Krause@ceyoniq.com' })).toEqual([
+      'T.Krause@ceyoniq.com',
+      'T.Krause',
+    ])
+  })
+
+  it('asks nothing for a member without name and address', () => {
+    expect(queriesFor({ name: ' ', email: null })).toEqual([])
   })
 })
 
@@ -412,7 +456,7 @@ describe('fetchTeamAvatars', () => {
     const fetchMock = vi.fn().mockResolvedValue(ok([hit()]))
 
     const avatars = await fetchTeamAvatars(server, credentials, deps(fetchMock), [
-      { name: 'Timo', jiraUser: null },
+      { name: 'Timo', email: null },
     ])
 
     expect(avatars.Timo).toBe(
@@ -421,36 +465,85 @@ describe('fetchTeamAvatars', () => {
     )
   })
 
-  it('searches for the pinned jira user instead of the display name', async () => {
+  it('searches for the configured address instead of the display name', async () => {
     const fetchMock = vi.fn().mockResolvedValue(ok([hit()]))
 
     await fetchTeamAvatars(server, credentials, deps(fetchMock), [
-      { name: 'Timo', jiraUser: 't.weber' },
+      { name: 'Timo', email: 't.weber@example.com' },
     ])
 
-    expect(String(fetchMock.mock.calls[0]![0])).toContain('username=t.weber')
+    expect(decodeURIComponent(String(fetchMock.mock.calls[0]![0]))).toContain(
+      'username=t.weber@example.com',
+    )
+  })
+
+  it('falls back to the local part when jira hides the mail address', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok([]))
+      .mockResolvedValueOnce(ok([hit({ name: 't.weber' })]))
+
+    const avatars = await fetchTeamAvatars(server, credentials, deps(fetchMock), [
+      { name: 'Timo', email: 't.weber@example.com' },
+    ])
+
+    expect(decodeURIComponent(String(fetchMock.mock.calls[1]![0]))).toContain('username=t.weber&')
+    expect(avatars.Timo).toContain(encodeURIComponent('ownerId=t.weber'))
+  })
+
+  it('stops searching as soon as a picture was found', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(ok([hit()]))
+
+    await fetchTeamAvatars(server, credentials, deps(fetchMock), [
+      { name: 'Timo', email: 't.weber@example.com' },
+    ])
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   it('leaves a member without a picture instead of failing the whole board', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({ ok: false, status: 404, statusText: 'Not Found' } as Response)
+      .mockResolvedValue({ ok: false, status: 404, statusText: 'Not Found' } as Response)
       .mockResolvedValueOnce(ok([hit()]))
 
     const avatars = await fetchTeamAvatars(server, credentials, deps(fetchMock), [
-      { name: 'Daniel', jiraUser: null },
-      { name: 'Timo', jiraUser: null },
+      { name: 'Timo', email: null },
+      { name: 'Daniel', email: null },
     ])
 
-    expect(avatars.Daniel).toBeNull()
     expect(avatars.Timo).not.toBeNull()
+    expect(avatars.Daniel).toBeNull()
+  })
+
+  it('says in the log which queries it tried for whom', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(ok([]))
+    const log = vi.fn()
+
+    await fetchTeamAvatars(server, credentials, { ...deps(fetchMock), log }, [
+      { name: 'Daniel', email: 'D.Dietrich@example.com' },
+    ])
+
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('Daniel'))
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('D.Dietrich@example.com → 0'))
+  })
+
+  it('stays quiet in the log once a picture was found', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(ok([hit()]))
+    const log = vi.fn()
+
+    await fetchTeamAvatars(server, credentials, { ...deps(fetchMock), log }, [
+      { name: 'Timo', email: null },
+    ])
+
+    expect(log).not.toHaveBeenCalled()
   })
 
   it('asks jira nothing for a member without a name', async () => {
     const fetchMock = vi.fn().mockResolvedValue(ok([hit()]))
 
     const avatars = await fetchTeamAvatars(server, credentials, deps(fetchMock), [
-      { name: ' ', jiraUser: null },
+      { name: ' ', email: null },
     ])
 
     expect(avatars[' ']).toBeNull()
@@ -461,7 +554,7 @@ describe('fetchTeamAvatars', () => {
     const fetchMock = vi.fn().mockResolvedValue(ok([hit({ avatarUrls: undefined })]))
 
     const avatars = await fetchTeamAvatars(server, credentials, deps(fetchMock), [
-      { name: 'Timo', jiraUser: null },
+      { name: 'Timo', email: null },
     ])
 
     expect(avatars.Timo).toBeNull()

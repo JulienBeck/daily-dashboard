@@ -26,10 +26,26 @@ Fehler den letzten erfolgreichen Stand weiter, damit das Board um 9:00 nicht lee
 Adressen an, die auf der konfigurierten Jira-Instanz liegen — sonst wäre er ein offener Proxy, der
 mit deinem Token fremde Ziele abfragt.
 
-Die Bilder der Teilnehmer sucht der Proxy über `/user/search` — mit `team[].jiraUser`, sonst mit
-dem Namen. Ein mehrdeutiger Vorname liefert bewusst **kein** Bild, sondern die Anfangsbuchstaben:
-ein fremdes Gesicht im Daily fällt niemandem auf, ein Kreis mit Kürzeln schon. Fehlt dem Token das
-Recht `Browse users`, bleibt es ebenfalls bei den Kürzeln.
+Die Bilder der Teilnehmer sucht der Proxy über `/user/search`, der Reihe nach mit `team[].email`,
+dessen lokalem Teil vor dem `@` und zuletzt mit `name`. Die zweite Runde ist der wichtige Fall:
+**Jira gibt die Mailadresse je nach Datenschutzeinstellung gar nicht heraus**, dann findet die
+Suche danach niemanden, wohl aber nach dem Benutzernamen — und der ist meist genau dieser lokale
+Teil. Genommen wird nur ein Treffer, der im Benutzernamen, Anzeigenamen oder in der Adresse
+**genau** passt, oder der einzige Treffer überhaupt. Ein mehrdeutiger Vorname liefert bewusst
+**kein** Bild, sondern die Anfangsbuchstaben: ein fremdes Gesicht im Daily fällt niemandem auf,
+ein Kreis mit Kürzeln schon.
+
+Bleibt jemand ohne Bild, steht im Proxy-Log, was versucht wurde und wie viele Treffer kamen:
+
+```
+Jira: kein Profilbild für Daniel (D.Dietrich@ceyoniq.com → 0, D.Dietrich → 0, Daniel → 3)
+```
+
+Durchweg `0` heißt: dem Token fehlt das globale Recht `Browse users`, oder der Benutzername sieht
+anders aus — dann die Adresse durch den Jira-Benutzernamen ersetzen, `email` nimmt beides.
+
+**Die Adresse verlässt den Proxy nicht.** `/api/board` liefert Name, Kürzel, Abwesenheit und
+Bildadresse — `email` wird dort abgeschnitten (`forBoard` in `src/server/index.ts`).
 
 ## Kalender
 
@@ -115,7 +131,7 @@ Merge-Request-Läufe und externe Läufe bleiben außen vor — die gehören nich
 | `jira.epicsJql` | gesetzt überschreibt es Board und Status komplett. **Die tatsächlich gesendete Abfrage steht im Board** hinter dem Abzeichen `JQL` neben der Überschrift — darüberfahren genügt |
 | `jira.epicsLimit` | wie viele Epics oben Platz haben (3–4) |
 | `jira.laneStatus` | je Spalte eine Liste von **Zielstatus-Namen** für das Verschieben per Drag-and-drop. Leer gelassen nimmt der Proxy den ersten passenden Übergang — siehe „Stories verschieben" |
-| `team[].jiraUser` | Jira-Benutzername für das Profilbild. Weggelassen sucht der Proxy nach `name` und nimmt den Treffer nur, wenn er eindeutig ist |
+| `team[].email` | Dienstliche Adresse, mit der die Person in den angebundenen Systemen gefunden wird — heute das Jira-Profilbild. Weggelassen sucht der Proxy nach `name` und nimmt den Treffer nur, wenn er eindeutig ist. Ein Jira-Benutzername tut es auch, die Suche nimmt beides |
 | `activity.days` / `activity.perMember` | Rückblick in Tagen und wie viele Pushes je Person unter dem Namen stehen |
 | `calendar.sources` | je Person ein Eintrag `{ member, env, own }`. `env` nennt die **Umgebungsvariable**, in der die ICS-Adresse steht — die Adresse selbst bleibt in der `.env`, weil sie das Geheimnis ist |
 | `calendar.absenceKeywords` | ganztägige Termine mit einem dieser Wörter im Titel gelten als Abwesenheit und überschreiben `team[].away` |
@@ -138,10 +154,14 @@ Ohne `laneStatus` landet „In Arbeit" bei einem Workflow mit *In Progress* **un
 deshalb auf dem, was Jira zuerst nennt. Tauchen die falschen Status auf: Namen eintragen.
 
 ```json
-"laneStatus": {
-  "todo": ["To Do", "Offen"],
-  "doing": ["In Progress"],
-  "done": ["Done", "Erledigt"]
+{
+  "jira": {
+    "laneStatus": {
+      "todo": ["To Do", "Offen"],
+      "doing": ["In Progress"],
+      "done": ["Done", "Erledigt"]
+    }
+  }
 }
 ```
 

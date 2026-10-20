@@ -73,8 +73,6 @@ export interface TeamMember {
   gitlabUser: string | null
   /** true for the one member the GITLAB_TOKEN belongs to. */
   self: boolean
-  /** Jira user to look the picture up with; null means search by name. */
-  jiraUser: string | null
   /** Filled by the proxy, not by the config file. */
   avatar: string | null
 }

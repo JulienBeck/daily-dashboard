@@ -14,7 +14,6 @@ const member = (over: Partial<TeamMember> = {}): TeamMember => ({
   away: null,
   gitlabUser: null,
   self: false,
-  jiraUser: null,
   avatar: null,
   ...over,
 })

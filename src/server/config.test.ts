@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseConfig } from './config.js'
+import { forBoard, parseConfig } from './config.js'
 
 describe('parseConfig', () => {
   it('fills every section when given nothing', () => {
@@ -48,15 +48,34 @@ describe('parseConfig', () => {
     expect(config.jira.laneStatus.done).toEqual([])
   })
 
-  it('keeps a pinned jira user and leaves the picture to the proxy', () => {
-    const config = parseConfig({ team: [{ name: 'Timo', jiraUser: 't.weber' }] })
-    expect(config.team[0]!.jiraUser).toBe('t.weber')
+  it('keeps the mail address and leaves the picture to the proxy', () => {
+    const config = parseConfig({ team: [{ name: 'Timo', email: 't.weber@example.com' }] })
+    expect(config.team[0]!.email).toBe('t.weber@example.com')
     expect(config.team[0]!.avatar).toBeNull()
   })
 
-  it('searches by name when no jira user is pinned', () => {
-    expect(parseConfig({ team: [{ name: 'Timo' }] }).team[0]!.jiraUser).toBeNull()
-    expect(parseConfig({ team: [{ name: 'Timo', jiraUser: '' }] }).team[0]!.jiraUser).toBeNull()
+  it('keeps the mail address out of what the browser gets', () => {
+    const member = parseConfig({ team: [{ name: 'Timo', email: 't.weber@example.com' }] }).team[0]!
+    expect(forBoard(member, null)).not.toHaveProperty('email')
+  })
+
+  it('hands the browser everything the board needs to draw a member', () => {
+    const member = parseConfig({
+      team: [{ name: 'Timo', away: 'Urlaub', gitlabUser: 'timo', email: 't@example.com' }],
+    }).team[0]!
+    expect(forBoard(member, '/api/avatar?url=x')).toEqual({
+      name: 'Timo',
+      initials: 'T',
+      away: 'Urlaub',
+      gitlabUser: 'timo',
+      self: false,
+      avatar: '/api/avatar?url=x',
+    })
+  })
+
+  it('searches by name when no address is given', () => {
+    expect(parseConfig({ team: [{ name: 'Timo' }] }).team[0]!.email).toBeNull()
+    expect(parseConfig({ team: [{ name: 'Timo', email: '' }] }).team[0]!.email).toBeNull()
   })
 
   it('shows epics in progress by default, because that is the running theme', () => {

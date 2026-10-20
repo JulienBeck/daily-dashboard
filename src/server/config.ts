@@ -40,11 +40,28 @@ export interface CalendarConfig {
   absenceKeywords: string[]
 }
 
+/** The address never leaves the proxy — it identifies the member towards Jira. */
+export interface ConfigMember extends TeamMember {
+  email: string | null
+}
+
+/** Listed field by field, so a new config-only field cannot slip to the browser. */
+export function forBoard(member: ConfigMember, avatar: string | null): TeamMember {
+  return {
+    name: member.name,
+    initials: member.initials,
+    away: member.away,
+    gitlabUser: member.gitlabUser,
+    self: member.self,
+    avatar,
+  }
+}
+
 export interface DashboardConfig {
   gitlab: GitlabConfig
   jira: JiraConfig
   theme: { reminderLeadMonths: number }
-  team: TeamMember[]
+  team: ConfigMember[]
   calendar: CalendarConfig
   activity: { days: number; perMember: number }
   refreshSeconds: number
@@ -117,7 +134,7 @@ export function parseConfig(raw: unknown): DashboardConfig {
       // username; false/absent means this member gets no commit list at all.
       gitlabUser: typeof member.gitlabUser === 'string' && member.gitlabUser ? member.gitlabUser : null,
       self: member.gitlabUser === true || member.self === true,
-      jiraUser: typeof member.jiraUser === 'string' && member.jiraUser ? member.jiraUser : null,
+      email: typeof member.email === 'string' && member.email ? member.email : null,
       avatar: null,
     })),
     calendar: {

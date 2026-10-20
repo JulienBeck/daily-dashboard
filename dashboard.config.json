@@ -47,13 +47,13 @@
     "reminderLeadMonths": 1
   },
   "team": [
-    { "name": "Julien", "away": null, "gitlabUser": true },
-    { "name": "Timo", "away": null, "gitlabUser": false },
-    { "name": "Daniel", "away": null, "gitlabUser": false },
-    { "name": "Saverio", "away": null, "gitlabUser": false }
+    { "name": "Timo", "away": null, "gitlabUser": false, "email": "T.Krause@ceyoniq.com" },
+    { "name": "Julien", "away": null, "gitlabUser": true , "email": "J.Beck@ceyoniq.com"},
+    { "name": "Daniel", "away": null, "gitlabUser": false, "email": "D.Dietrich@ceyoniq.com" },
+    { "name": "Saverio", "away": null, "gitlabUser": false, "email": "S.Mancuso@ceyoniq.com" }
   ],
   "calendar": {
-    "sources": [{ "member": "J. Beck", "env": "CALENDAR_ICS_URL", "own": true }],
+    "sources": [{ "member": "J. Beck", "env": "CALENDAR_ICS_URL", "own": true  }],
     "absenceKeywords": ["urlaub", "abwesend", "frei", "krank", "ooo", "out of office"]
   },
   "activity": {

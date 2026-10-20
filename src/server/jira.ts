@@ -10,6 +10,7 @@ export interface JiraCredentials {
 export interface JiraDeps {
   fetch: typeof fetch
   now: () => Date
+  log?: (message: string) => void
 }
 
 export function authHeader(credentials: JiraCredentials, flavor: 'server' | 'cloud'): string {
@@ -279,6 +280,7 @@ export async function fetchAvatar(
 export interface JiraUser {
   name?: string
   displayName?: string
+  emailAddress?: string
   avatarUrls?: Record<string, string>
 }
 
@@ -287,45 +289,59 @@ export function userSearchPath(flavor: 'server' | 'cloud', query: string): strin
   return `/rest/api/${apiPath(flavor)}/user/search?${param}=${encodeURIComponent(query)}&maxResults=10`
 }
 
+const normalise = (value: string | undefined) => (value ?? '').trim().toLowerCase()
+
 /**
- * A pinned jiraUser is trusted; a plain first name is not. Without an exact or
- * unique hit we rather show the initials than a stranger's face.
+ * Only an exact or an unambiguous hit counts — a wrong face in the daily goes
+ * unnoticed, a circle with initials does not.
  */
-export function pickUser(
-  users: readonly JiraUser[],
-  query: string,
-  pinned: boolean,
-): JiraUser | null {
-  if (pinned) return users[0] ?? null
-  const wanted = query.trim().toLowerCase()
+export function pickUser(users: readonly JiraUser[], query: string): JiraUser | null {
+  const wanted = normalise(query)
   const exact = users.filter((user) =>
-    [user.name, user.displayName].some((value) => (value ?? '').trim().toLowerCase() === wanted),
+    [user.name, user.displayName, user.emailAddress].some((value) => normalise(value) === wanted),
   )
   if (exact.length === 1) return exact[0]!
   return users.length === 1 ? users[0]! : null
+}
+
+/**
+ * Jira hides mail addresses depending on the instance's privacy setting, so the
+ * address alone finds nobody there. The local part usually is the username.
+ */
+export function queriesFor(member: { name: string; email: string | null }): string[] {
+  const candidates = member.email
+    ? [member.email, member.email.split('@')[0] ?? '', member.name]
+    : [member.name]
+  return [...new Set(candidates.map((value) => value.trim()).filter(Boolean))]
 }
 
 export async function fetchTeamAvatars(
   config: JiraConfig,
   credentials: JiraCredentials,
   deps: JiraDeps,
-  members: readonly { name: string; jiraUser: string | null }[],
+  members: readonly { name: string; email: string | null }[],
 ): Promise<Record<string, string | null>> {
   const flavor = await detectFlavor(config, credentials, deps)
 
   const entries = await Promise.all(
     members.map(async (member) => {
-      const query = member.jiraUser ?? member.name
-      if (!query.trim()) return [member.name, null] as const
-      const users = await call<JiraUser[]>(
-        config,
-        credentials,
-        flavor,
-        deps,
-        userSearchPath(flavor, query),
-      ).catch(() => [])
-      const picked = pickUser(users, query, member.jiraUser !== null)
-      return [member.name, avatarUrl(picked?.avatarUrls, config.baseUrl)] as const
+      const tried: string[] = []
+
+      for (const query of queriesFor(member)) {
+        const users = await call<JiraUser[]>(
+          config,
+          credentials,
+          flavor,
+          deps,
+          userSearchPath(flavor, query),
+        ).catch(() => [])
+        tried.push(`${query} → ${users.length}`)
+        const avatar = avatarUrl(pickUser(users, query)?.avatarUrls, config.baseUrl)
+        if (avatar) return [member.name, avatar] as const
+      }
+
+      deps.log?.(`Jira: kein Profilbild für ${member.name} (${tried.join(', ')})`)
+      return [member.name, null] as const
     }),
   )
 
