@@ -34,9 +34,14 @@
     "doingStatusCategories": ["indeterminate"],
     "weekComponents": ["Woche 1", "Woche 2"],
     "epicsBoardId": 96,
-    "epicsJql": "project = PRO AND issuetype = Epic AND component = \"nscale AI\" AND statusCategory = \"In Progress\" ORDER BY Rank DESC",
+    "epicsJql": "project = PRO AND issuetype = Epic AND component = \"nscale AI\" AND (statusCategory = \"In Progress\" OR statusCategory = Done) ORDER BY Rank DESC",
     "epicsStatusCategories": ["indeterminate"],
-    "epicsLimit": 4
+    "epicsLimit": 4,
+    "laneStatus": {
+      "todo": [],
+      "doing": [],
+      "done": []
+    }
   },
   "theme": {
     "reminderLeadMonths": 1

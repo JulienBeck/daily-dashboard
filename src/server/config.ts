@@ -26,6 +26,7 @@ export interface JiraConfig {
   epicsJql: string | null
   epicsStatusCategories: string[]
   epicsLimit: number
+  laneStatus: Record<'todo' | 'doing' | 'done', string[]>
 }
 
 export interface CalendarSource {
@@ -57,6 +58,8 @@ const initials = (name: string) =>
     .map((part) => part[0]!.toUpperCase())
     .slice(0, 2)
     .join('')
+
+const names = (raw: unknown): string[] => (Array.isArray(raw) ? raw.map(String) : [])
 
 export function parseConfig(raw: unknown): DashboardConfig {
   const source = (raw ?? {}) as Record<string, any>
@@ -99,6 +102,11 @@ export function parseConfig(raw: unknown): DashboardConfig {
         ? jira.epicsStatusCategories.map(String)
         : ['indeterminate'],
       epicsLimit: Number(jira.epicsLimit ?? 4),
+      laneStatus: {
+        todo: names(jira.laneStatus?.todo),
+        doing: names(jira.laneStatus?.doing),
+        done: names(jira.laneStatus?.done),
+      },
     },
     theme: { reminderLeadMonths: Number(theme.reminderLeadMonths ?? 1) },
     team: (Array.isArray(source.team) ? source.team : []).map((member: any) => ({
@@ -109,6 +117,8 @@ export function parseConfig(raw: unknown): DashboardConfig {
       // username; false/absent means this member gets no commit list at all.
       gitlabUser: typeof member.gitlabUser === 'string' && member.gitlabUser ? member.gitlabUser : null,
       self: member.gitlabUser === true || member.self === true,
+      jiraUser: typeof member.jiraUser === 'string' && member.jiraUser ? member.jiraUser : null,
+      avatar: null,
     })),
     calendar: {
       sources: (Array.isArray(calendar.sources) ? calendar.sources : []).map((entry: any) => ({

@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
-import { eventPath, fetchCommits, sinceOf, toCommitRows, type PushEvent } from './activity.js'
+import {
+  eventPath,
+  fetchCommits,
+  missingProjectIds,
+  sinceOf,
+  toCommitRows,
+  type PushEvent,
+} from './activity.js'
 
 const names = new Map([
   [1, 'ki-backend'],
@@ -92,6 +99,83 @@ describe('fetchCommits', () => {
       5,
     )
     expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+})
+
+describe('missingProjectIds', () => {
+  it('names the projects the membership list does not cover', () => {
+    expect(missingProjectIds([push({ project_id: 99 })], names)).toEqual([99])
+  })
+
+  it('asks for an unknown project only once, however often it was pushed to', () => {
+    expect(
+      missingProjectIds([push({ project_id: 99 }), push({ project_id: 99 })], names),
+    ).toEqual([99])
+  })
+
+  it('stays quiet for projects that are already known', () => {
+    expect(missingProjectIds([push({ project_id: 1 })], names)).toEqual([])
+  })
+
+  it('ignores events that never become a row', () => {
+    const empty = push({ project_id: 99, push_data: { commit_title: null } })
+    expect(missingProjectIds([empty], names)).toEqual([])
+  })
+
+  it('ignores an event without a project at all', () => {
+    expect(missingProjectIds([push({ project_id: undefined })], names)).toEqual([])
+  })
+})
+
+describe('fetchCommits project names', () => {
+  const config = { baseUrl: 'https://git.example.com' } as never
+  const deps = () => ({ fetch: vi.fn(), now: () => new Date(2026, 9, 19) })
+  const ok = (body: unknown) => ({ ok: true, json: async () => body })
+  const member = [{ name: 'Julien', gitlabUser: null, self: true }]
+
+  it('looks a project up when it is not in the membership list', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok([{ id: 1, name: 'ki-backend' }]))
+      .mockResolvedValueOnce(ok([push({ project_id: 77 })]))
+      .mockResolvedValueOnce(ok({ id: 77, name: 'daily-dashboard' }))
+
+    const result = await fetchCommits(
+      config,
+      't',
+      { fetch: fetchMock as never, now: () => new Date(2026, 9, 19) },
+      member,
+      1,
+      5,
+    )
+
+    expect(String(fetchMock.mock.calls[2]![0])).toContain('/projects/77')
+    expect(result.Julien![0]!.project).toBe('daily-dashboard')
+  })
+
+  it('looks nothing up when the membership list already knows the project', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok([{ id: 1, name: 'ki-backend' }]))
+      .mockResolvedValueOnce(ok([push({ project_id: 1 })]))
+
+    const result = await fetchCommits(config, 't', { ...deps(), fetch: fetchMock as never }, member, 1, 5)
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(result.Julien![0]!.project).toBe('ki-backend')
+  })
+
+  it('keeps the dash when even the lookup fails, instead of losing the commit', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok([]))
+      .mockResolvedValueOnce(ok([push({ project_id: 77 })]))
+      .mockResolvedValueOnce({ ok: false, status: 404, statusText: 'Not Found' })
+
+    const result = await fetchCommits(config, 't', { ...deps(), fetch: fetchMock as never }, member, 1, 5)
+
+    expect(result.Julien).toHaveLength(1)
+    expect(result.Julien![0]!.project).toBe('—')
   })
 })
 

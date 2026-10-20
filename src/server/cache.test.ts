@@ -66,6 +66,27 @@ describe('StaleCache', () => {
     expect(result.stale).toBe(false)
   })
 
+  it('reloads a key that was invalidated before its ttl ran out', async () => {
+    const cache = new StaleCache(() => 1_000_000)
+    const load = vi.fn().mockResolvedValueOnce('a').mockResolvedValueOnce('b')
+
+    await cache.get('k', 60, load)
+    cache.invalidate('k')
+
+    expect((await cache.get('k', 60, load)).data).toBe('b')
+    expect(load).toHaveBeenCalledTimes(2)
+  })
+
+  it('leaves the other keys alone when one is invalidated', async () => {
+    const cache = new StaleCache(() => 1_000_000)
+    await cache.get('a', 60, () => Promise.resolve(1))
+    await cache.get('b', 60, () => Promise.resolve(2))
+
+    cache.invalidate('a')
+
+    expect((await cache.get('b', 60, () => Promise.resolve(9))).data).toBe(2)
+  })
+
   it('keeps separate keys apart', async () => {
     const cache = new StaleCache(() => 0)
     await cache.get('a', 60, () => Promise.resolve(1))

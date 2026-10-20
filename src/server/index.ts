@@ -4,7 +4,15 @@ import { StaleCache } from './cache.js'
 import { fetchCalendar } from './calendar.js'
 import { loadConfig } from './config.js'
 import { fetchMergeRequests, fetchPipelines } from './gitlab.js'
-import { fetchAvatar, fetchEpics, fetchSprint } from './jira.js'
+import {
+  fetchAvatar,
+  fetchEpics,
+  fetchSprint,
+  fetchTeamAvatars,
+  isIssueKey,
+  isLane,
+  moveIssue,
+} from './jira.js'
 
 const config = loadConfig()
 const cache = new StaleCache()
@@ -22,8 +30,20 @@ const guard = (condition: boolean, message: string) => {
   if (!condition) throw new Error(message)
 }
 
+// Pictures are a nicety: a sulking Jira must not cost us the whole board.
+async function teamWithAvatars() {
+  if (!jiraCredentials.token || !config.jira.baseUrl) return config.team
+  const payload = await cache
+    .get('team-avatars', config.cacheSeconds.jira * 10, () =>
+      fetchTeamAvatars(config.jira, jiraCredentials, deps, config.team),
+    )
+    .catch(() => null)
+  const avatars = payload?.data ?? {}
+  return config.team.map((member) => ({ ...member, avatar: avatars[member.name] ?? null }))
+}
+
 app.get('/api/board', async () => ({
-  team: config.team,
+  team: await teamWithAvatars(),
   refreshSeconds: config.refreshSeconds,
   reminderLeadMonths: config.theme.reminderLeadMonths,
   weekComponents: config.jira.weekComponents,
@@ -100,6 +120,26 @@ app.get('/api/sprint', async () => {
     fetchSprint(config.jira, jiraCredentials, deps),
   )
 })
+
+app.post<{ Params: { key: string }; Body: { lane?: string } }>(
+  '/api/issues/:key/lane',
+  async (request) => {
+    guard(Boolean(jiraCredentials.token), 'JIRA_TOKEN ist nicht gesetzt')
+    guard(isIssueKey(request.params.key), 'Kein gültiger Jira-Schlüssel')
+    const lane = request.body?.lane
+    guard(isLane(lane), 'Unbekannte Spalte')
+    const moved = await moveIssue(
+      config.jira,
+      jiraCredentials,
+      deps,
+      request.params.key,
+      lane as 'todo' | 'doing' | 'done',
+    )
+    // The board polls the cached sprint; without this the card would snap back.
+    cache.invalidate('sprint')
+    return moved
+  },
+)
 
 app.setErrorHandler((error: unknown, _request, reply) => {
   app.log.error(error)

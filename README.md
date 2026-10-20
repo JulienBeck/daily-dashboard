@@ -12,6 +12,7 @@ Statisches Mockup ohne Build: [`design/mockup.html`](design/mockup.html).
 Browser (SPA, kein Token)
    │  /api/board /api/pipelines /api/mrs /api/sprint /api/epics
    │  /api/commits /api/calendar /api/avatar
+   │  POST /api/issues/<key>/lane
    ▼
 Fastify-Proxy (GITLAB_TOKEN, JIRA_TOKEN)
    ├─► GitLab GraphQL  /api/graphql
@@ -24,6 +25,11 @@ Fehler den letzten erfolgreichen Stand weiter, damit das Board um 9:00 nicht lee
 `/api/avatar` holt Jira-Profilbilder, weil der Browser dafür keinen Token hat. Er nimmt nur
 Adressen an, die auf der konfigurierten Jira-Instanz liegen — sonst wäre er ein offener Proxy, der
 mit deinem Token fremde Ziele abfragt.
+
+Die Bilder der Teilnehmer sucht der Proxy über `/user/search` — mit `team[].jiraUser`, sonst mit
+dem Namen. Ein mehrdeutiger Vorname liefert bewusst **kein** Bild, sondern die Anfangsbuchstaben:
+ein fremdes Gesicht im Daily fällt niemandem auf, ein Kreis mit Kürzeln schon. Fehlt dem Token das
+Recht `Browse users`, bleibt es ebenfalls bei den Kürzeln.
 
 ## Kalender
 
@@ -108,9 +114,40 @@ Merge-Request-Läufe und externe Läufe bleiben außen vor — die gehören nich
 | `jira.epicsStatusCategories` | welche Epics gezeigt werden; Vorgabe `["indeterminate"]` = **In Progress**, also das laufende Theme |
 | `jira.epicsJql` | gesetzt überschreibt es Board und Status komplett. **Die tatsächlich gesendete Abfrage steht im Board** hinter dem Abzeichen `JQL` neben der Überschrift — darüberfahren genügt |
 | `jira.epicsLimit` | wie viele Epics oben Platz haben (3–4) |
+| `jira.laneStatus` | je Spalte eine Liste von **Zielstatus-Namen** für das Verschieben per Drag-and-drop. Leer gelassen nimmt der Proxy den ersten passenden Übergang — siehe „Stories verschieben" |
+| `team[].jiraUser` | Jira-Benutzername für das Profilbild. Weggelassen sucht der Proxy nach `name` und nimmt den Treffer nur, wenn er eindeutig ist |
 | `activity.days` / `activity.perMember` | Rückblick in Tagen und wie viele Pushes je Person unter dem Namen stehen |
 | `calendar.sources` | je Person ein Eintrag `{ member, env, own }`. `env` nennt die **Umgebungsvariable**, in der die ICS-Adresse steht — die Adresse selbst bleibt in der `.env`, weil sie das Geheimnis ist |
 | `calendar.absenceKeywords` | ganztägige Termine mit einem dieser Wörter im Titel gelten als Abwesenheit und überschreiben `team[].away` |
+
+## Stories verschieben
+
+Eine Karte lässt sich im Daily mit der Maus in eine andere Spalte ziehen; der Proxy führt dazu
+einen Jira-Übergang aus. Die Karte springt sofort — die Antwort aus Jira wird nicht abgewartet.
+Lehnt Jira ab, rutscht sie zurück und oben rechts im Board steht der Grund (Tooltip).
+
+Die Woche bleibt beim Ziehen unberührt: Bänder sind Komponenten, Spalten sind Status.
+
+Weil eine Spalte eine ganze **Statuskategorie** umfasst, passen oft mehrere Übergänge. Die
+Reihenfolge ist:
+
+1. der erste Status aus `jira.laneStatus.<spalte>`, der im Vorgang überhaupt erreichbar ist,
+2. sonst der erste angebotene Übergang in die Kategorie der Spalte.
+
+Ohne `laneStatus` landet „In Arbeit" bei einem Workflow mit *In Progress* **und** *In Review*
+deshalb auf dem, was Jira zuerst nennt. Tauchen die falschen Status auf: Namen eintragen.
+
+```json
+"laneStatus": {
+  "todo": ["To Do", "Offen"],
+  "doing": ["In Progress"],
+  "done": ["Done", "Erledigt"]
+}
+```
+
+Gibt es gar keinen passenden Übergang — fehlende Rechte oder ein Workflow, der den Sprung nicht
+erlaubt — nennt die Fehlermeldung die Status, die der Vorgang stattdessen anbietet. Der Token
+braucht dafür Schreibrechte; ein reiner Lesezugriff ergibt `403`.
 
 ## Jahreszeiten
 

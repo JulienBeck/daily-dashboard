@@ -51,6 +51,33 @@ async function rest<T>(
   return (await response.json()) as T
 }
 
+export function missingProjectIds(
+  events: readonly PushEvent[],
+  known: ReadonlyMap<number, string>,
+): number[] {
+  const ids = events
+    .filter((event) => Boolean(event.push_data?.commit_title))
+    .map((event) => event.project_id)
+    .filter((id): id is number => typeof id === 'number')
+  return [...new Set(ids)].filter((id) => !known.has(id))
+}
+
+async function resolveProjects(
+  config: GitlabConfig,
+  token: string,
+  deps: GitlabDeps,
+  ids: readonly number[],
+): Promise<[number, string][]> {
+  const found = await Promise.all(
+    ids.map((id) =>
+      rest<{ name?: string }>(config, token, deps, `/projects/${id}`)
+        .then((project) => (project.name ? ([id, project.name] as [number, string]) : null))
+        .catch(() => null),
+    ),
+  )
+  return found.filter((entry): entry is [number, string] => entry !== null)
+}
+
 export function eventPath(
   member: { gitlabUser: string | null; self: boolean },
   since: string,
@@ -79,14 +106,26 @@ export async function fetchCommits(
   ).catch(() => [])
   const names = new Map(projects.map((project) => [project.id, project.name]))
 
-  const entries = await Promise.all(
+  const pushes = await Promise.all(
     members.map(async (member) => {
       const path = eventPath(member, since)
-      if (path === null) return [member.name, []] as const
+      if (path === null) return [member.name, [] as PushEvent[]] as const
       const events = await rest<PushEvent[]>(config, token, deps, path).catch(() => [])
-      return [member.name, toCommitRows(events, names, limit)] as const
+      return [member.name, events] as const
     }),
   )
 
-  return Object.fromEntries(entries)
+  const seen = pushes.flatMap(([, events]) => events)
+  for (const [id, name] of await resolveProjects(
+    config,
+    token,
+    deps,
+    missingProjectIds(seen, names),
+  )) {
+    names.set(id, name)
+  }
+
+  return Object.fromEntries(
+    pushes.map(([member, events]) => [member, toCommitRows(events, names, limit)]),
+  )
 }

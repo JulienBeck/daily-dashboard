@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { IssueRow } from '../shared/types.js'
 import {
   nextSeason,
   nextSeasonStart,
@@ -15,6 +16,7 @@ import {
   getMergeRequests,
   getPipelines,
   getSprint,
+  moveIssue,
 } from './api.js'
 import { usePolled } from './usePolled.js'
 import { Ampel } from './components/Ampel.js'
@@ -87,6 +89,15 @@ export function App() {
 
   const showReminder = reminderActive(clock, lead) && !dismissed
 
+  const reloadSprint = sprint.reload
+  const onMove = useCallback(
+    async (key: string, lane: IssueRow['lane']) => {
+      await moveIssue(key, lane)
+      await reloadSprint()
+    },
+    [reloadSprint],
+  )
+
   const onDismiss = () => {
     localStorage.setItem(dismissKey(start.toISOString()), todayStamp(clock))
     setDismissed(true)
@@ -130,6 +141,7 @@ export function App() {
             <Stories
               issues={sprint.value?.data.issues ?? []}
               weeks={board.value?.weekComponents ?? []}
+              onMove={onMove}
             />
           )}
         </div>

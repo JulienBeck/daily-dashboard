@@ -10,9 +10,16 @@ import {
   epicsJqlFor,
   estimationField,
   fetchEpics,
+  fetchTeamAvatars,
   initialsOf,
+  pickUser,
+  userSearchPath,
+  isIssueKey,
+  isLane,
   laneOf,
+  moveIssue,
   pickStoryPointsField,
+  pickTransition,
   summarise,
   toIssueRows,
   weekOf,
@@ -345,6 +352,254 @@ describe('fetchEpics', () => {
         { fetch: fetchMock as never, now: () => now },
       ),
     ).rejects.toThrow(/epicsBoardId/)
+  })
+})
+
+describe('userSearchPath', () => {
+  it('searches by username on server, because cloud hides it', () => {
+    expect(userSearchPath('server', 'timo')).toContain('/rest/api/2/user/search?username=timo')
+  })
+
+  it('searches by free query on cloud', () => {
+    expect(userSearchPath('cloud', 'timo')).toContain('/rest/api/3/user/search?query=timo')
+  })
+
+  it('escapes a name with a space in it', () => {
+    expect(userSearchPath('server', 'Jan Beck')).toContain('username=Jan%20Beck')
+  })
+})
+
+describe('pickUser', () => {
+  const user = (name: string, displayName: string) => ({ name, displayName })
+
+  it('trusts the first hit when the member pinned a jira user', () => {
+    expect(pickUser([user('a', 'Anna'), user('b', 'Bert')], 'a', true)?.name).toBe('a')
+  })
+
+  it('takes the only hit when a plain name is unambiguous', () => {
+    expect(pickUser([user('t.weber', 'Timo Weber')], 'Timo', false)?.name).toBe('t.weber')
+  })
+
+  it('prefers the exact display name over the other hits', () => {
+    const picked = pickUser([user('a', 'Timo Weber'), user('b', 'Timo')], 'Timo', false)
+    expect(picked?.name).toBe('b')
+  })
+
+  it('shows nobody rather than the wrong face when a first name is ambiguous', () => {
+    expect(pickUser([user('a', 'Timo Weber'), user('b', 'Timo Kern')], 'Timo', false)).toBeNull()
+  })
+
+  it('returns null when the search found nobody', () => {
+    expect(pickUser([], 'Timo', false)).toBeNull()
+    expect(pickUser([], 'timo', true)).toBeNull()
+  })
+})
+
+describe('fetchTeamAvatars', () => {
+  const ok = (body: unknown) => ({ ok: true, json: async () => body }) as Response
+  const server = { ...config, flavor: 'server' as const }
+  const credentials = { token: 't', email: null }
+  const deps = (fetchMock: unknown) => ({ fetch: fetchMock as never, now: () => now })
+
+  const hit = (over: Record<string, unknown> = {}) => ({
+    name: 't.weber',
+    displayName: 'Timo Weber',
+    avatarUrls: { '48x48': '/secure/useravatar?ownerId=t.weber' },
+    ...over,
+  })
+
+  it('routes the picture through the proxy, because the browser has no token', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(ok([hit()]))
+
+    const avatars = await fetchTeamAvatars(server, credentials, deps(fetchMock), [
+      { name: 'Timo', jiraUser: null },
+    ])
+
+    expect(avatars.Timo).toBe(
+      '/api/avatar?url=' +
+        encodeURIComponent('https://jira.example.com/secure/useravatar?ownerId=t.weber'),
+    )
+  })
+
+  it('searches for the pinned jira user instead of the display name', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(ok([hit()]))
+
+    await fetchTeamAvatars(server, credentials, deps(fetchMock), [
+      { name: 'Timo', jiraUser: 't.weber' },
+    ])
+
+    expect(String(fetchMock.mock.calls[0]![0])).toContain('username=t.weber')
+  })
+
+  it('leaves a member without a picture instead of failing the whole board', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 404, statusText: 'Not Found' } as Response)
+      .mockResolvedValueOnce(ok([hit()]))
+
+    const avatars = await fetchTeamAvatars(server, credentials, deps(fetchMock), [
+      { name: 'Daniel', jiraUser: null },
+      { name: 'Timo', jiraUser: null },
+    ])
+
+    expect(avatars.Daniel).toBeNull()
+    expect(avatars.Timo).not.toBeNull()
+  })
+
+  it('asks jira nothing for a member without a name', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(ok([hit()]))
+
+    const avatars = await fetchTeamAvatars(server, credentials, deps(fetchMock), [
+      { name: ' ', jiraUser: null },
+    ])
+
+    expect(avatars[' ']).toBeNull()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('leaves a user without a picture null', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(ok([hit({ avatarUrls: undefined })]))
+
+    const avatars = await fetchTeamAvatars(server, credentials, deps(fetchMock), [
+      { name: 'Timo', jiraUser: null },
+    ])
+
+    expect(avatars.Timo).toBeNull()
+  })
+})
+
+describe('isIssueKey', () => {
+  it('accepts a normal jira key', () => {
+    expect(isIssueKey('PRO-1234')).toBe(true)
+  })
+
+  it('rejects a key carrying a path, so it cannot reach another endpoint', () => {
+    expect(isIssueKey('PRO-1/../../admin')).toBe(false)
+    expect(isIssueKey('PRO-1?expand=x')).toBe(false)
+  })
+
+  it('rejects something that is not a key at all', () => {
+    expect(isIssueKey('PRO')).toBe(false)
+    expect(isIssueKey('')).toBe(false)
+  })
+})
+
+describe('isLane', () => {
+  it('knows the three board columns', () => {
+    expect(isLane('todo')).toBe(true)
+    expect(isLane('doing')).toBe(true)
+    expect(isLane('done')).toBe(true)
+  })
+
+  it('rejects anything else', () => {
+    expect(isLane('erledigt')).toBe(false)
+    expect(isLane(null)).toBe(false)
+  })
+})
+
+describe('pickTransition', () => {
+  const lanes = parseConfig({
+    jira: { laneStatus: { doing: ['In Progress'], done: [], todo: [] } },
+  }).jira
+
+  const transition = (id: string, name: string, category: string) => ({
+    id,
+    name,
+    to: { name, statusCategory: { key: category } },
+  })
+
+  it('prefers the status named in the configuration', () => {
+    const picked = pickTransition(
+      [
+        transition('1', 'In Review', 'indeterminate'),
+        transition('2', 'In Progress', 'indeterminate'),
+      ],
+      'doing',
+      lanes,
+    )
+    expect(picked?.id).toBe('2')
+  })
+
+  it('keeps the configured order when several names fit', () => {
+    const config = parseConfig({
+      jira: { laneStatus: { doing: ['In Review', 'In Progress'] } },
+    }).jira
+    const picked = pickTransition(
+      [
+        transition('1', 'In Progress', 'indeterminate'),
+        transition('2', 'In Review', 'indeterminate'),
+      ],
+      'doing',
+      config,
+    )
+    expect(picked?.id).toBe('2')
+  })
+
+  it('ignores case and stray spaces in the configured name', () => {
+    const picked = pickTransition([transition('7', ' in progress ', 'indeterminate')], 'doing', lanes)
+    expect(picked?.id).toBe('7')
+  })
+
+  it('falls back to the first transition of the right category', () => {
+    const picked = pickTransition(
+      [transition('1', 'Reopen', 'new'), transition('2', 'Resolve', 'done')],
+      'done',
+      lanes,
+    )
+    expect(picked?.id).toBe('2')
+  })
+
+  it('never takes a transition whose category is unknown, even into todo', () => {
+    expect(pickTransition([{ id: '1', name: 'Irgendwas', to: { name: 'X' } }], 'todo', lanes)).toBeNull()
+  })
+
+  it('returns null when nothing leads into that column', () => {
+    expect(pickTransition([transition('1', 'Resolve', 'done')], 'doing', lanes)).toBeNull()
+  })
+})
+
+describe('moveIssue', () => {
+  const ok = (body: unknown) => ({ ok: true, json: async () => body }) as Response
+  const server = { ...config, flavor: 'server' as const }
+  const credentials = { token: 't', email: null }
+
+  const transitions = {
+    transitions: [
+      { id: '31', name: 'Start', to: { name: 'In Progress', statusCategory: { key: 'indeterminate' } } },
+      { id: '41', name: 'Fertig', to: { name: 'Done', statusCategory: { key: 'done' } } },
+    ],
+  }
+
+  it('posts the transition that belongs to the dropped column', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(ok(transitions)).mockResolvedValueOnce(ok({}))
+
+    const result = await moveIssue(server, credentials, { fetch: fetchMock as never, now: () => now }, 'PRO-7', 'done')
+
+    const [url, init] = fetchMock.mock.calls[1]!
+    expect(String(url)).toBe('https://jira.example.com/rest/api/2/issue/PRO-7/transitions')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body)).toEqual({ transition: { id: '41' } })
+    expect(result).toEqual({ key: 'PRO-7', lane: 'done', status: 'Done' })
+  })
+
+  it('names the possible transitions when the column cannot be reached', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(ok({ transitions: [transitions.transitions[0]] }))
+
+    await expect(
+      moveIssue(server, credentials, { fetch: fetchMock as never, now: () => now }, 'PRO-7', 'done'),
+    ).rejects.toThrow(/In Progress/)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('passes a failing transition on instead of reporting success', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok(transitions))
+      .mockResolvedValueOnce({ ok: false, status: 403, statusText: 'Forbidden' } as Response)
+
+    await expect(
+      moveIssue(server, credentials, { fetch: fetchMock as never, now: () => now }, 'PRO-7', 'done'),
+    ).rejects.toThrow(/403/)
   })
 })
 

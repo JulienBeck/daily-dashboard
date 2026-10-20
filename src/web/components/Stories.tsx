@@ -1,5 +1,8 @@
+import { useState } from 'react'
 import type { IssueRow } from '../../shared/types.js'
 import { IconBoard, IconFlag } from '../icons.js'
+
+type Lane = IssueRow['lane']
 
 const LANES = [
   { key: 'todo' as const, label: 'To Do' },
@@ -10,6 +13,15 @@ const LANES = [
 export interface Band {
   label: string
   issues: IssueRow[]
+}
+
+export type Moves = Record<string, Lane>
+
+export function applyMoves(issues: readonly IssueRow[], moves: Moves): IssueRow[] {
+  return issues.map((issue) => {
+    const lane = moves[issue.key]
+    return lane && lane !== issue.lane ? { ...issue, lane } : issue
+  })
 }
 
 export function bandsOf(issues: readonly IssueRow[], weeks: readonly string[]): Band[] {
@@ -29,7 +41,19 @@ export function bandWeight(band: Band): number {
   return Math.max(1, ...perLane)
 }
 
-function Card({ issue }: { issue: IssueRow }) {
+function Card({
+  issue,
+  draggable,
+  busy,
+  onDragStart,
+  onDragEnd,
+}: {
+  issue: IssueRow
+  draggable: boolean
+  busy: boolean
+  onDragStart: () => void
+  onDragEnd: () => void
+}) {
   const done = issue.lane === 'done'
   const accent = done ? 'var(--ink-muted)' : issue.flagged ? 'var(--critical)' : 'var(--accent)'
 
@@ -38,9 +62,16 @@ function Card({ issue }: { issue: IssueRow }) {
       href={issue.webUrl}
       target="_blank"
       rel="noreferrer"
+      draggable={draggable}
+      onDragStart={(event) => {
+        event.dataTransfer?.setData('text/plain', issue.key)
+        if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
+        onDragStart()
+      }}
+      onDragEnd={onDragEnd}
       className={`block rounded-lg border border-white/10 border-l-2 bg-card px-2.5 py-1.5 no-underline ${
         done ? 'opacity-55' : ''
-      }`}
+      } ${draggable ? 'cursor-grab active:cursor-grabbing' : ''} ${busy ? 'animate-pulse' : ''}`}
       style={{ borderLeftColor: done ? 'var(--rule)' : accent }}
     >
       <div
@@ -75,17 +106,59 @@ function Card({ issue }: { issue: IssueRow }) {
   )
 }
 
-export function Stories({ issues, weeks }: { issues: IssueRow[]; weeks: string[] }) {
-  const points = issues.reduce((total, issue) => total + (issue.points ?? 0), 0)
-  const bands = bandsOf(issues, weeks)
+export function Stories({
+  issues,
+  weeks,
+  onMove,
+}: {
+  issues: IssueRow[]
+  weeks: string[]
+  onMove?: (key: string, lane: Lane) => Promise<unknown>
+}) {
+  const [moves, setMoves] = useState<Moves>({})
+  const [dragging, setDragging] = useState<string | null>(null)
+  const [over, setOver] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const shown = applyMoves(issues, moves)
+  const points = shown.reduce((total, issue) => total + (issue.points ?? 0), 0)
+  const bands = bandsOf(shown, weeks)
+
+  const forget = (key: string) =>
+    setMoves((previous) => {
+      const rest = { ...previous }
+      delete rest[key]
+      return rest
+    })
+
+  const drop = (lane: Lane, key: string) => {
+    setOver(null)
+    setDragging(null)
+    const issue = shown.find((row) => row.key === key)
+    if (!onMove || !issue || issue.lane === lane) return
+    setError(null)
+    setMoves((previous) => ({ ...previous, [key]: lane }))
+    void onMove(key, lane).then(
+      () => forget(key),
+      (reason: unknown) => {
+        forget(key)
+        setError(reason instanceof Error ? reason.message : String(reason))
+      },
+    )
+  }
 
   return (
     <section className="panel grid min-h-0 grid-rows-[auto_auto_1fr] border-t-2 border-t-accent">
       <div className="panel-head">
         <IconBoard className="text-sm" />
         <span className="flex-1">Stories im Sprint</span>
+        {error ? (
+          <span className="normal-case text-serious" title={error}>
+            Jira: Verschieben fehlgeschlagen
+          </span>
+        ) : null}
         <span className="num normal-case">
-          {issues.length} Vorgänge · {points} P
+          {shown.length} Vorgänge · {points} P
         </span>
       </div>
 
@@ -97,7 +170,7 @@ export function Stories({ issues, weeks }: { issues: IssueRow[]; weeks: string[]
           >
             {lane.label}
             <span className="num ml-auto rounded-full bg-card px-1.5 text-[11px] text-ink-2">
-              {issues.filter((issue) => issue.lane === lane.key).length}
+              {shown.filter((issue) => issue.lane === lane.key).length}
             </span>
           </h3>
         ))}
@@ -121,17 +194,52 @@ export function Stories({ issues, weeks }: { issues: IssueRow[]; weeks: string[]
               <span className="h-px flex-1 bg-rule" />
             </div>
             <div className="grid min-h-0 grid-cols-3 gap-2.5">
-              {LANES.map((lane) => (
-                <ul key={lane.key} className="grid content-start gap-1.5 overflow-hidden" role="list">
-                  {band.issues
-                    .filter((issue) => issue.lane === lane.key)
-                    .map((issue) => (
-                      <li key={issue.key}>
-                        <Card issue={issue} />
-                      </li>
-                    ))}
-                </ul>
-              ))}
+              {LANES.map((lane) => {
+                const zone = `${band.label}:${lane.key}`
+                return (
+                  <ul
+                    key={lane.key}
+                    role="list"
+                    aria-label={`${lane.label} · ${band.label}`}
+                    onDragOver={(event) => {
+                      if (!onMove || !dragging) return
+                      event.preventDefault()
+                      if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+                      setOver(zone)
+                    }}
+                    onDragLeave={() => setOver((current) => (current === zone ? null : current))}
+                    onDrop={(event) => {
+                      event.preventDefault()
+                      const key = event.dataTransfer?.getData('text/plain') || dragging
+                      if (key) drop(lane.key, key)
+                    }}
+                    className={`grid content-start gap-1.5 overflow-hidden rounded-lg border border-dashed ${
+                      over === zone
+                        ? 'border-accent bg-accent/5'
+                        : dragging
+                          ? 'border-rule'
+                          : 'border-transparent'
+                    } ${onMove ? 'min-h-8' : ''}`}
+                  >
+                    {band.issues
+                      .filter((issue) => issue.lane === lane.key)
+                      .map((issue) => (
+                        <li key={issue.key}>
+                          <Card
+                            issue={issue}
+                            draggable={Boolean(onMove)}
+                            busy={issue.key in moves}
+                            onDragStart={() => setDragging(issue.key)}
+                            onDragEnd={() => {
+                              setDragging(null)
+                              setOver(null)
+                            }}
+                          />
+                        </li>
+                      ))}
+                  </ul>
+                )
+              })}
             </div>
           </div>
         ))}

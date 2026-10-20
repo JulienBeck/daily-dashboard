@@ -38,6 +38,27 @@ describe('parseConfig', () => {
     expect(custom.jira.epicsLimit).toBe(3)
   })
 
+  it('leaves every lane without a preferred status, so jira decides alone', () => {
+    expect(parseConfig({}).jira.laneStatus).toEqual({ todo: [], doing: [], done: [] })
+  })
+
+  it('keeps the order of the preferred statuses, because the first one wins', () => {
+    const config = parseConfig({ jira: { laneStatus: { doing: ['In Review', 'In Progress'] } } })
+    expect(config.jira.laneStatus.doing).toEqual(['In Review', 'In Progress'])
+    expect(config.jira.laneStatus.done).toEqual([])
+  })
+
+  it('keeps a pinned jira user and leaves the picture to the proxy', () => {
+    const config = parseConfig({ team: [{ name: 'Timo', jiraUser: 't.weber' }] })
+    expect(config.team[0]!.jiraUser).toBe('t.weber')
+    expect(config.team[0]!.avatar).toBeNull()
+  })
+
+  it('searches by name when no jira user is pinned', () => {
+    expect(parseConfig({ team: [{ name: 'Timo' }] }).team[0]!.jiraUser).toBeNull()
+    expect(parseConfig({ team: [{ name: 'Timo', jiraUser: '' }] }).team[0]!.jiraUser).toBeNull()
+  })
+
   it('shows epics in progress by default, because that is the running theme', () => {
     expect(parseConfig({}).jira.epicsStatusCategories).toEqual(['indeterminate'])
   })

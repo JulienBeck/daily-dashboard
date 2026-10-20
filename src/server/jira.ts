@@ -149,6 +149,105 @@ async function call<T>(
   return (await response.json()) as T
 }
 
+async function post(
+  config: JiraConfig,
+  credentials: JiraCredentials,
+  flavor: 'server' | 'cloud',
+  deps: JiraDeps,
+  path: string,
+  body: unknown,
+): Promise<void> {
+  const response = await deps.fetch(`${config.baseUrl}${path}`, {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      'content-type': 'application/json',
+      authorization: authHeader(credentials, flavor),
+    },
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) throw new Error(`Jira ${response.status} ${response.statusText}`)
+}
+
+export function isIssueKey(value: string): boolean {
+  return /^[A-Za-z][A-Za-z0-9]*-\d+$/.test(value)
+}
+
+export function isLane(value: unknown): value is IssueRow['lane'] {
+  return value === 'todo' || value === 'doing' || value === 'done'
+}
+
+export interface Transition {
+  id: string
+  name: string
+  to?: { name?: string; statusCategory?: { key?: string } }
+}
+
+type LaneConfig = Pick<
+  JiraConfig,
+  'doneStatusCategories' | 'doingStatusCategories' | 'laneStatus'
+>
+
+/**
+ * A lane holds a whole status category, so several transitions can fit. The
+ * configured status names win; without them the first matching one is taken.
+ */
+export function pickTransition(
+  transitions: readonly Transition[],
+  lane: IssueRow['lane'],
+  config: LaneConfig,
+): Transition | null {
+  const normalise = (value: string) => value.trim().toLowerCase()
+  const wanted = config.laneStatus[lane].map(normalise)
+
+  for (const name of wanted) {
+    const named = transitions.find((transition) => normalise(transition.to?.name ?? '') === name)
+    if (named) return named
+  }
+
+  return (
+    transitions.find((transition) => {
+      const category = transition.to?.statusCategory?.key
+      return Boolean(category) && laneOf(String(category), config) === lane
+    }) ?? null
+  )
+}
+
+export async function moveIssue(
+  config: JiraConfig,
+  credentials: JiraCredentials,
+  deps: JiraDeps,
+  key: string,
+  lane: IssueRow['lane'],
+): Promise<{ key: string; lane: IssueRow['lane']; status: string }> {
+  const flavor = await detectFlavor(config, credentials, deps)
+  const version = apiPath(flavor)
+
+  const available = await call<{ transitions: Transition[] }>(
+    config,
+    credentials,
+    flavor,
+    deps,
+    `/rest/api/${version}/issue/${key}/transitions`,
+  )
+  const transitions = available.transitions ?? []
+  const picked = pickTransition(transitions, lane, config)
+
+  if (!picked) {
+    const offered = transitions.map((transition) => transition.to?.name ?? transition.name)
+    throw new Error(
+      `Jira: ${key} kennt keinen Übergang in diese Spalte` +
+        (offered.length > 0 ? ` — möglich wäre: ${offered.join(', ')}` : ''),
+    )
+  }
+
+  await post(config, credentials, flavor, deps, `/rest/api/${version}/issue/${key}/transitions`, {
+    transition: { id: picked.id },
+  })
+
+  return { key, lane, status: picked.to?.name ?? picked.name }
+}
+
 export function sameOrigin(candidate: string, baseUrl: string): boolean {
   try {
     return new URL(candidate).origin === new URL(baseUrl).origin
@@ -175,6 +274,62 @@ export async function fetchAvatar(
     body: await response.arrayBuffer(),
     contentType: response.headers.get('content-type') ?? 'image/png',
   }
+}
+
+export interface JiraUser {
+  name?: string
+  displayName?: string
+  avatarUrls?: Record<string, string>
+}
+
+export function userSearchPath(flavor: 'server' | 'cloud', query: string): string {
+  const param = flavor === 'cloud' ? 'query' : 'username'
+  return `/rest/api/${apiPath(flavor)}/user/search?${param}=${encodeURIComponent(query)}&maxResults=10`
+}
+
+/**
+ * A pinned jiraUser is trusted; a plain first name is not. Without an exact or
+ * unique hit we rather show the initials than a stranger's face.
+ */
+export function pickUser(
+  users: readonly JiraUser[],
+  query: string,
+  pinned: boolean,
+): JiraUser | null {
+  if (pinned) return users[0] ?? null
+  const wanted = query.trim().toLowerCase()
+  const exact = users.filter((user) =>
+    [user.name, user.displayName].some((value) => (value ?? '').trim().toLowerCase() === wanted),
+  )
+  if (exact.length === 1) return exact[0]!
+  return users.length === 1 ? users[0]! : null
+}
+
+export async function fetchTeamAvatars(
+  config: JiraConfig,
+  credentials: JiraCredentials,
+  deps: JiraDeps,
+  members: readonly { name: string; jiraUser: string | null }[],
+): Promise<Record<string, string | null>> {
+  const flavor = await detectFlavor(config, credentials, deps)
+
+  const entries = await Promise.all(
+    members.map(async (member) => {
+      const query = member.jiraUser ?? member.name
+      if (!query.trim()) return [member.name, null] as const
+      const users = await call<JiraUser[]>(
+        config,
+        credentials,
+        flavor,
+        deps,
+        userSearchPath(flavor, query),
+      ).catch(() => [])
+      const picked = pickUser(users, query, member.jiraUser !== null)
+      return [member.name, avatarUrl(picked?.avatarUrls, config.baseUrl)] as const
+    }),
+  )
+
+  return Object.fromEntries(entries)
 }
 
 export function toEpicRows(
