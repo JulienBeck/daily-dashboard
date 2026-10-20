@@ -1,6 +1,5 @@
 import type { Season } from '../../shared/season.js'
 import type { EpicRow } from '../../shared/types.js'
-import { SEASON_ICON } from '../icons.js'
 import { SEASON_ART } from '../seasonArt.js'
 import { Epics } from './Epics.js'
 
@@ -36,8 +35,6 @@ export function SeasonHeader({
   epicsJql,
   epicsError,
 }: Props) {
-  const NextIcon = SEASON_ICON[next.key]
-
   return (
     <header className="panel grid grid-cols-[auto_auto_1fr_auto] items-center gap-5 border-l-[3px] border-l-accent py-2.5">
       <div className="text-center">
@@ -68,9 +65,13 @@ export function SeasonHeader({
           </div>
           <div>ab {shortDate.format(nextStart)}</div>
         </div>
-        <NextIcon
-          className="shrink-0 text-[26px] text-ink-2"
+        <img
+          src={SEASON_ART[next.key]}
+          alt={next.label}
           title={`nächstes Theme: ${next.label}`}
+          className="size-[42px] shrink-0 rounded-md"
+          width={42}
+          height={42}
         />
       </div>
     </header>
