@@ -14,6 +14,8 @@ const member = (over: Partial<TeamMember> = {}): TeamMember => ({
   away: null,
   gitlabUser: null,
   self: false,
+  jiraUser: null,
+  avatar: null,
   ...over,
 })
 
@@ -104,6 +106,26 @@ describe('People', () => {
   it('counts an absence that only the calendar knows about', () => {
     render0([member()], {}, { 'J. Beck': day({ away: 'Urlaub' }) })
     expect(screen.getByText('0 / 1')).toBeInTheDocument()
+  })
+
+  it('shows the jira picture instead of the initials', () => {
+    render0([member({ avatar: '/api/avatar?url=x' })])
+    expect(screen.getByRole('img', { name: 'J. Beck' })).toHaveAttribute(
+      'src',
+      '/api/avatar?url=x',
+    )
+    expect(screen.queryByText('JB')).not.toBeInTheDocument()
+  })
+
+  it('falls back to the initials when jira has no picture for someone', () => {
+    render0([member({ avatar: null })])
+    expect(screen.queryByRole('img', { name: 'J. Beck' })).not.toBeInTheDocument()
+    expect(screen.getByText('JB')).toBeInTheDocument()
+  })
+
+  it('dims the picture of an absent member, as it dims the initials', () => {
+    render0([member({ avatar: '/api/avatar?url=x', away: 'Urlaub' })])
+    expect(screen.getByRole('img', { name: 'J. Beck' }).className).toContain('opacity-45')
   })
 
   it('names the repository next to the commit, not only in the tooltip', () => {

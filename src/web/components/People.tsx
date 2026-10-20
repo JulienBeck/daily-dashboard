@@ -102,13 +102,25 @@ export function People({ team, commits, calendar }: Props) {
                   away ? 'text-muted' : 'text-ink-2'
                 } ${count > 0 ? 'hover:text-ink' : 'cursor-default'}`}
               >
-                <span
-                  className={`grid size-6 shrink-0 place-items-center rounded-full border border-white/10 bg-card text-[10px] font-bold ${
-                    away ? 'opacity-45' : ''
-                  }`}
-                >
-                  {member.initials}
-                </span>
+                {member.avatar ? (
+                  <img
+                    src={member.avatar}
+                    alt={member.name}
+                    className={`size-6 shrink-0 rounded-full border border-white/10 ${
+                      away ? 'opacity-45' : ''
+                    }`}
+                    width={24}
+                    height={24}
+                  />
+                ) : (
+                  <span
+                    className={`grid size-6 shrink-0 place-items-center rounded-full border border-white/10 bg-card text-[10px] font-bold ${
+                      away ? 'opacity-45' : ''
+                    }`}
+                  >
+                    {member.initials}
+                  </span>
+                )}
                 {member.name}
                 {count > 0 ? (
                   <>
