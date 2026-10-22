@@ -1,4 +1,5 @@
 import Fastify from 'fastify'
+import { dayKey, resolveAbsence } from './absence.js'
 import { fetchCommits } from './activity.js'
 import { StaleCache } from './cache.js'
 import { fetchCalendar } from './calendar.js'
@@ -35,21 +36,30 @@ const guard = (condition: boolean, message: string) => {
 }
 
 // Pictures are a nicety: a sulking Jira must not cost us the whole board.
-async function teamWithAvatars() {
-  if (!jiraCredentials.token || !config.jira.baseUrl) {
-    return config.team.map((member) => forBoard(member, null))
-  }
+async function avatarsByName(): Promise<Record<string, string | null>> {
+  if (!jiraCredentials.token || !config.jira.baseUrl) return {}
   const payload = await cache
     .get('team-avatars', config.cacheSeconds.jira * 10, () =>
       fetchTeamAvatars(config.jira, jiraCredentials, deps, config.team),
     )
     .catch(() => null)
-  const avatars = payload?.data ?? {}
-  return config.team.map((member) => forBoard(member, avatars[member.name] ?? null))
+  return payload?.data ?? {}
+}
+
+async function teamForBoard() {
+  const avatars = await avatarsByName()
+  const today = dayKey(deps.now())
+  return config.team.map((member) =>
+    forBoard(
+      member,
+      avatars[member.name] ?? null,
+      resolveAbsence(config.absences, member.name, today, config.theme.absenceLookaheadDays),
+    ),
+  )
 }
 
 app.get('/api/board', async () => ({
-  team: await teamWithAvatars(),
+  team: await teamForBoard(),
   refreshSeconds: config.refreshSeconds,
   reminderLeadMonths: config.theme.reminderLeadMonths,
   weekComponents: config.jira.weekComponents,

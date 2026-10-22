@@ -6,7 +6,7 @@ import type {
   CommitRow,
   TeamMember,
 } from '../../shared/types.js'
-import { awayOf, isOver, leadOf, People } from './People.js'
+import { awayOf, isOver, leadOf, nextAwayOf, People } from './People.js'
 
 const member = (over: Partial<TeamMember> = {}): TeamMember => ({
   name: 'J. Beck',
@@ -15,6 +15,15 @@ const member = (over: Partial<TeamMember> = {}): TeamMember => ({
   gitlabUser: null,
   self: false,
   avatar: null,
+  nextAway: null,
+  ...over,
+})
+
+const soon = (inDays: number, over: Partial<TeamMember['nextAway'] & object> = {}) => ({
+  label: 'Urlaub',
+  from: '2026-11-03',
+  to: '2026-11-06',
+  inDays,
   ...over,
 })
 
@@ -68,6 +77,29 @@ describe('awayOf', () => {
 
   it('reports present when neither source says otherwise', () => {
     expect(awayOf(member(), { 'J. Beck': day() })).toBeNull()
+  })
+})
+
+describe('nextAwayOf', () => {
+  it('says nothing when no absence is coming', () => {
+    expect(nextAwayOf(null)).toBeNull()
+  })
+
+  it('says morgen instead of naming the weekday', () => {
+    expect(nextAwayOf(soon(1))).toBe('Urlaub ab morgen')
+  })
+
+  it('names the weekday while it is still this week', () => {
+    expect(nextAwayOf(soon(5))).toBe('Urlaub ab Di')
+  })
+
+  it('switches to a date once the weekday would be ambiguous', () => {
+    expect(nextAwayOf(soon(7))).toMatch(/^Urlaub ab 03\.11\.?$/)
+    expect(nextAwayOf(soon(12))).toMatch(/^Urlaub ab 03\.11\.?$/)
+  })
+
+  it('carries the label, so a course is not called a holiday', () => {
+    expect(nextAwayOf(soon(3, { label: 'Fortbildung' }))).toBe('Fortbildung ab Di')
   })
 })
 
@@ -238,5 +270,31 @@ describe('People', () => {
     render0([member({ name: 'T. Weber', away: 'Urlaub bis 24.10.' })])
     const row = screen.getAllByRole('listitem')[0]!
     expect(within(row).getByText('Urlaub bis 24.10.')).toBeInTheDocument()
+  })
+
+  it('announces an absence that has not started yet', () => {
+    render0([member({ nextAway: soon(5) })])
+    expect(screen.getByText('Urlaub ab Di')).toBeInTheDocument()
+  })
+
+  it('counts someone with a coming absence as present today', () => {
+    render0([member({ nextAway: soon(5) })])
+    expect(screen.getByText('1 / 1')).toBeInTheDocument()
+  })
+
+  it('shows today before the outlook when both apply', () => {
+    render0([member({ away: 'Krank', nextAway: soon(5) })])
+    expect(screen.getByText('Krank')).toBeInTheDocument()
+    expect(screen.queryByText('Urlaub ab Di')).not.toBeInTheDocument()
+  })
+
+  it('lets the calendar absence of today silence the outlook too', () => {
+    render0([member({ nextAway: soon(5) })], {}, { 'J. Beck': day({ away: 'Urlaub' }) })
+    expect(screen.queryByText('Urlaub ab Di')).not.toBeInTheDocument()
+  })
+
+  it('stays bare for a member with nothing coming', () => {
+    render0([member()])
+    expect(screen.queryByText(/ ab /)).not.toBeInTheDocument()
   })
 })

@@ -65,6 +65,13 @@ export interface SprintInfo {
   points: { done: number; doing: number; open: number }
 }
 
+export interface UpcomingAbsence {
+  label: string
+  from: string
+  to: string
+  inDays: number
+}
+
 export interface TeamMember {
   name: string
   initials: string
@@ -75,6 +82,8 @@ export interface TeamMember {
   self: boolean
   /** Filled by the proxy, not by the config file. */
   avatar: string | null
+  /** The next absence that has not started yet, within the lookahead window. */
+  nextAway: UpcomingAbsence | null
 }
 
 export interface CalendarEntry {

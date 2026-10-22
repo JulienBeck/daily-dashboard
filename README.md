@@ -135,6 +135,48 @@ Merge-Request-Läufe und externe Läufe bleiben außen vor — die gehören nich
 | `activity.days` / `activity.perMember` | Rückblick in Tagen und wie viele Pushes je Person unter dem Namen stehen |
 | `calendar.sources` | je Person ein Eintrag `{ member, env, own }`. `env` nennt die **Umgebungsvariable**, in der die ICS-Adresse steht — die Adresse selbst bleibt in der `.env`, weil sie das Geheimnis ist |
 | `calendar.absenceKeywords` | ganztägige Termine mit einem dieser Wörter im Titel gelten als Abwesenheit und überschreiben `team[].away` |
+| `absences` | handgepflegte Urlaubsliste mit Zeitraum — siehe „Urlaube eintragen" |
+| `theme.absenceLookaheadDays` | wie weit das Board auf kommende Urlaube vorausschaut, Vorgabe 14 Tage |
+
+## Urlaube eintragen
+
+Solange kein Teamkalender angebunden ist, stehen die Abwesenheiten mit Datum in `absences` —
+eine flache Liste, chronologisch oder nicht, der Proxy sucht sich den passenden Eintrag selbst:
+
+```json
+{
+  "absences": [
+    { "member": "Timo", "from": "2026-10-20", "to": "2026-10-24" },
+    { "member": "Julien", "from": "2026-12-22", "to": "2027-01-02" },
+    { "member": "Daniel", "from": "2026-11-03", "label": "Fortbildung" }
+  ]
+}
+```
+
+| Feld | Regel |
+|---|---|
+| `member` | muss **wörtlich** einem `team[].name` entsprechen — ein Eintrag ohne Treffer bleibt wirkungslos |
+| `from` / `to` | `YYYY-MM-DD`, **`to` zählt mit**: bis einschließlich diesem Tag ist die Person weg. `to` weglassen heißt „ein einzelner Tag" |
+| `label` | optional, Vorgabe `Urlaub`. Steht so im Board, also auch `Fortbildung` oder `Elternzeit` |
+
+Ein Eintrag mit kaputtem Datum (`20.10.2026`, `2026-10-20T00:00:00Z`) oder ohne `member` wird
+**stillschweigend übergangen** — die übrigen bleiben gültig. Wer einen Urlaub einträgt und ihn
+im Board nicht sieht, prüft zuerst Schreibweise des Namens und Datumsformat.
+
+Wer heute dran ist, steht ausgegraut mit dem Label neben dem Namen und zählt nicht zum
+`n / m` in der Kopfzeile. Wessen Urlaub bevorsteht, bekommt einen stillen Hinweis rechts —
+`Urlaub ab morgen`, innerhalb einer Woche `Urlaub ab Di`, darüber hinaus `Urlaub ab 03.11.`.
+Der Hinweis verschwindet, sobald die Person ohnehin als abwesend geführt wird.
+
+Die Quellen überlagern sich in dieser Reihenfolge: **ICS-Kalender** schlägt **`absences`**
+schlägt **`team[].away`**. Damit bleibt `team[].away` der datumslose Dauervermerk, während die
+Urlaubsliste von selbst wieder abläuft. Welcher Tag „heute" ist, entscheidet die **Zeitzone des
+Proxy-Prozesses**; die `docker-compose.yml` setzt dafür `TZ` auf `Europe/Berlin`. Ohne das liefe
+der Container in UTC und der Urlaub wechselte im Sommer um 02:00 statt um Mitternacht.
+
+Die Liste wird bei **jedem** `/api/board` neu ausgewertet, nicht zwischengespeichert; eine
+geänderte `dashboard.config.json` braucht allerdings einen Neustart des Proxy, weil sie beim
+Start gelesen wird.
 
 ## Stories verschieben
 

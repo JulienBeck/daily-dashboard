@@ -1,5 +1,11 @@
 import { useState } from 'react'
-import type { CalendarByMember, CalendarEntry, CommitRow, TeamMember } from '../../shared/types.js'
+import type {
+  CalendarByMember,
+  CalendarEntry,
+  CommitRow,
+  TeamMember,
+  UpcomingAbsence,
+} from '../../shared/types.js'
 import { IconChevron, IconMerge, IconPeople, IconTimer } from '../icons.js'
 
 interface Props {
@@ -9,9 +15,19 @@ interface Props {
 }
 
 const time = new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' })
+const weekday = new Intl.DateTimeFormat('de-DE', { weekday: 'short' })
+const date = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit' })
 
 export function awayOf(member: TeamMember, calendar: CalendarByMember): string | null {
   return calendar[member.name]?.away ?? member.away
+}
+
+export function nextAwayOf(next: UpcomingAbsence | null): string | null {
+  if (!next) return null
+  const day = new Date(`${next.from}T00:00:00`)
+  if (next.inDays === 1) return `${next.label} ab morgen`
+  if (next.inDays <= 6) return `${next.label} ab ${weekday.format(day)}`
+  return `${next.label} ab ${date.format(day)}`
 }
 
 export function isOver(entry: CalendarEntry, now: Date): boolean {
@@ -81,6 +97,7 @@ export function People({ team, commits, calendar }: Props) {
       <ul className="grid content-start gap-3 overflow-hidden text-[13px]" role="list">
         {team.map((member) => {
           const away = awayOf(member, calendar)
+          const soon = away ? null : nextAwayOf(member.nextAway)
           const pushes = commits[member.name] ?? []
           const day = calendar[member.name]
           const agenda = [
@@ -135,6 +152,14 @@ export function People({ team, commits, calendar }: Props) {
                   </>
                 ) : null}
                 {away ? <span className="ml-auto text-[11px]">{away}</span> : null}
+                {soon ? (
+                  <span
+                    className="ml-auto shrink-0 text-[11px] text-muted"
+                    title={`${member.nextAway!.from} bis ${member.nextAway!.to}`}
+                  >
+                    {soon}
+                  </span>
+                ) : null}
               </button>
 
               {expanded && count > 0 ? (

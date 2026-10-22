@@ -4,10 +4,15 @@ services:
       context: .
       dockerfile: Dockerfile.server
     environment:
+      # "Today" decides which holiday and which agenda is shown. Without this the
+      # container runs UTC and the day flips at 02:00 local time.
+      TZ: ${TZ:-Europe/Berlin}
       # Tokens come from .env next to this file and stay inside the container.
       GITLAB_TOKEN: ${GITLAB_TOKEN:?GITLAB_TOKEN fehlt - .env.example kopieren}
       JIRA_TOKEN: ${JIRA_TOKEN:-}
       JIRA_EMAIL: ${JIRA_EMAIL:-}
+      # Named by calendar.sources[].env in the config; without it that panel stays empty.
+      CALENDAR_ICS_URL: ${CALENDAR_ICS_URL:-}
       DASHBOARD_CONFIG: /config/dashboard.config.json
     volumes:
       # Mounted, not baked in: edit the file and restart, no rebuild.

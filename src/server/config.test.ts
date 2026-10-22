@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { forBoard, parseConfig } from './config.js'
 
+const present = { away: null, nextAway: null }
+
 describe('parseConfig', () => {
   it('fills every section when given nothing', () => {
     const config = parseConfig({})
@@ -56,21 +58,56 @@ describe('parseConfig', () => {
 
   it('keeps the mail address out of what the browser gets', () => {
     const member = parseConfig({ team: [{ name: 'Timo', email: 't.weber@example.com' }] }).team[0]!
-    expect(forBoard(member, null)).not.toHaveProperty('email')
+    expect(forBoard(member, null, present)).not.toHaveProperty('email')
   })
 
   it('hands the browser everything the board needs to draw a member', () => {
     const member = parseConfig({
       team: [{ name: 'Timo', away: 'Urlaub', gitlabUser: 'timo', email: 't@example.com' }],
     }).team[0]!
-    expect(forBoard(member, '/api/avatar?url=x')).toEqual({
+    expect(forBoard(member, '/api/avatar?url=x', present)).toEqual({
       name: 'Timo',
       initials: 'T',
       away: 'Urlaub',
       gitlabUser: 'timo',
       self: false,
       avatar: '/api/avatar?url=x',
+      nextAway: null,
     })
+  })
+
+  it('lets a dated absence overrule the standing note', () => {
+    const member = parseConfig({ team: [{ name: 'Timo', away: 'Elternzeit' }] }).team[0]!
+    expect(forBoard(member, null, { away: 'Fortbildung', nextAway: null }).away).toBe('Fortbildung')
+  })
+
+  it('keeps the standing note on a day without a dated absence', () => {
+    const member = parseConfig({ team: [{ name: 'Timo', away: 'Elternzeit' }] }).team[0]!
+    expect(forBoard(member, null, present).away).toBe('Elternzeit')
+  })
+
+  it('passes the coming absence through to the browser', () => {
+    const member = parseConfig({ team: [{ name: 'Timo' }] }).team[0]!
+    const next = { label: 'Urlaub', from: '2026-11-03', to: '2026-11-04', inDays: 3 }
+    expect(forBoard(member, null, { away: null, nextAway: next }).nextAway).toEqual(next)
+  })
+
+  it('reads the hand-written holiday list', () => {
+    const config = parseConfig({
+      absences: [{ member: 'Timo', from: '2026-10-20', to: '2026-10-24' }],
+    })
+    expect(config.absences).toEqual([
+      { member: 'Timo', from: '2026-10-20', to: '2026-10-24', label: 'Urlaub' },
+    ])
+  })
+
+  it('works without a holiday list at all', () => {
+    expect(parseConfig({}).absences).toEqual([])
+  })
+
+  it('looks two weeks ahead unless told otherwise', () => {
+    expect(parseConfig({}).theme.absenceLookaheadDays).toBe(14)
+    expect(parseConfig({ theme: { absenceLookaheadDays: 5 } }).theme.absenceLookaheadDays).toBe(5)
   })
 
   it('searches by name when no address is given', () => {

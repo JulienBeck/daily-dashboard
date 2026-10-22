@@ -34,7 +34,7 @@
     "doingStatusCategories": ["indeterminate"],
     "weekComponents": ["Woche 1", "Woche 2"],
     "epicsBoardId": 96,
-    "epicsJql": "project = PRO AND issuetype = Epic AND component = \"nscale AI\" AND (statusCategory = \"In Progress\" OR statusCategory = Done) ORDER BY Rank DESC",
+    "epicsJql": "issuekey in (PRO-3970, PRO-3883, PRO-3957)",
     "epicsStatusCategories": ["indeterminate"],
     "epicsLimit": 4,
     "laneStatus": {
@@ -44,13 +44,17 @@
     }
   },
   "theme": {
-    "reminderLeadMonths": 1
+    "reminderLeadMonths": 1,
+    "absenceLookaheadDays": 14
   },
   "team": [
     { "name": "Timo", "away": null, "gitlabUser": false, "email": "T.Krause@ceyoniq.com" },
     { "name": "Julien", "away": null, "gitlabUser": true , "email": "J.Beck@ceyoniq.com"},
     { "name": "Daniel", "away": null, "gitlabUser": false, "email": "D.Dietrich@ceyoniq.com" },
     { "name": "Saverio", "away": null, "gitlabUser": false, "email": "S.Mancuso@ceyoniq.com" }
+  ],
+  "absences": [
+    { "member": "Daniel", "from": "2026-10-26", "to": "2026-10-30" }
   ],
   "calendar": {
     "sources": [{ "member": "J. Beck", "env": "CALENDAR_ICS_URL", "own": true  }],

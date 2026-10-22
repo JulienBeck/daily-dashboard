@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import type { TeamMember } from '../shared/types.js'
+import { parseAbsences, type Absence, type MemberAbsence } from './absence.js'
 
 export interface GitlabConfig {
   baseUrl: string
@@ -41,27 +42,33 @@ export interface CalendarConfig {
 }
 
 /** The address never leaves the proxy — it identifies the member towards Jira. */
-export interface ConfigMember extends TeamMember {
+export interface ConfigMember extends Omit<TeamMember, 'nextAway'> {
   email: string | null
 }
 
 /** Listed field by field, so a new config-only field cannot slip to the browser. */
-export function forBoard(member: ConfigMember, avatar: string | null): TeamMember {
+export function forBoard(
+  member: ConfigMember,
+  avatar: string | null,
+  absence: MemberAbsence,
+): TeamMember {
   return {
     name: member.name,
     initials: member.initials,
-    away: member.away,
+    away: absence.away ?? member.away,
     gitlabUser: member.gitlabUser,
     self: member.self,
     avatar,
+    nextAway: absence.nextAway,
   }
 }
 
 export interface DashboardConfig {
   gitlab: GitlabConfig
   jira: JiraConfig
-  theme: { reminderLeadMonths: number }
+  theme: { reminderLeadMonths: number; absenceLookaheadDays: number }
   team: ConfigMember[]
+  absences: Absence[]
   calendar: CalendarConfig
   activity: { days: number; perMember: number }
   refreshSeconds: number
@@ -125,7 +132,10 @@ export function parseConfig(raw: unknown): DashboardConfig {
         done: names(jira.laneStatus?.done),
       },
     },
-    theme: { reminderLeadMonths: Number(theme.reminderLeadMonths ?? 1) },
+    theme: {
+      reminderLeadMonths: Number(theme.reminderLeadMonths ?? 1),
+      absenceLookaheadDays: Number(theme.absenceLookaheadDays ?? 14),
+    },
     team: (Array.isArray(source.team) ? source.team : []).map((member: any) => ({
       name: String(member.name ?? ''),
       initials: member.initials ? String(member.initials) : initials(String(member.name ?? '?')),
@@ -137,6 +147,7 @@ export function parseConfig(raw: unknown): DashboardConfig {
       email: typeof member.email === 'string' && member.email ? member.email : null,
       avatar: null,
     })),
+    absences: parseAbsences(source.absences),
     calendar: {
       sources: (Array.isArray(calendar.sources) ? calendar.sources : []).map((entry: any) => ({
         member: String(entry.member ?? ''),
