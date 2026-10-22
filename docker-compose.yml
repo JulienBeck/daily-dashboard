@@ -30,3 +30,12 @@ services:
     depends_on:
       - api
     restart: unless-stopped
+
+networks:
+  default:
+    ipam:
+      config:
+        # A VPN can install 0.0.0.0/1 and 128.0.0.0/1 routes; Docker then finds no
+        # free address pool and refuses to create the network. Pinning one skips
+        # that search. Set DOCKER_SUBNET if 172.28.0.0/24 clashes on your host.
+        - subnet: ${DOCKER_SUBNET:-172.28.0.0/24}

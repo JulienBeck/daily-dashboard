@@ -1,0 +1,25 @@
+# Keeps the build context small and the tokens out of it. Both Dockerfiles share
+# this file, so only add paths that neither of them COPYs.
+
+# Installed and built inside the image, never carried in.
+node_modules
+dist
+dist-server
+*.tsbuildinfo
+
+# Secrets. They reach the container through environment variables at run time.
+.env*
+
+# Nothing here is COPYd by either Dockerfile.
+.git
+.gitignore
+.idea
+.nvmrc
+.claude
+README.md
+design
+docker-compose.yml
+Dockerfile.*
+.dockerignore
+eslint.config.js
+vitest.config.ts

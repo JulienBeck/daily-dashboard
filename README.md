@@ -93,6 +93,30 @@ Zwei Images: `Dockerfile.server` (Proxy) und `Dockerfile.web` (nginx mit dem geb
 `dashboard.config.json` ist gemountet, nicht eingebacken — Datei ändern, `docker compose restart api`,
 fertig. Die Tokens kommen aus `.env` neben der Compose-Datei.
 
+| Variable | Wofür |
+|---|---|
+| `TZ` | entscheidet, welcher Tag „heute" ist — Vorgabe `Europe/Berlin`. Node bringt seine eigene Zeitzonendatenbank mit, im Alpine-Image muss dafür kein `tzdata` nachinstalliert werden |
+| `CALENDAR_ICS_URL` | wird durchgereicht, weil `calendar.sources[].env` sie nennt. Fehlt sie, bleibt nur dieses Panel leer |
+| `DOCKER_SUBNET` | Notausgang, Vorgabe `172.28.0.0/24` — siehe unten |
+
+**Kein freier Adresspool.** Scheitert `docker compose up` an
+`all predefined address pools have been fully subnetted`, liegen Catch-all-Routen auf dem Host
+(`0.0.0.0/1` und `128.0.0.0/1`, typisch für einen VPN-Client). Docker überspringt jeden Pool, der
+sich mit einer Host-Route überschneidet, und findet dann keinen. Das Compose-Netz hat deshalb ein
+**festes Subnetz** statt automatischer Vergabe; kollidiert `172.28.0.0/24` auf deiner Maschine,
+setze `DOCKER_SUBNET` in der `.env`. Gegenprobe, ob es wirklich daran liegt:
+`docker network create probe` scheitert dann auch ohne jedes Projekt.
+
+**Daemon in WSL, CLI unter Windows.** Läuft der Daemon in einer WSL-Distribution, gehören
+Compose-Aufrufe **nach WSL hinein** — der Windows-CLI schickt sonst Windows-Pfade als
+Bind-Mount-Quelle, die der Linux-Daemon nicht auflösen kann:
+
+```bash
+wsl -d Ubuntu -- bash -lc 'cd /mnt/c/.../daily-dashboard && docker compose up -d'
+```
+
+`docker compose config` druckt die Tokens im Klartext; zum reinen Prüfen `-q` anhängen.
+
 Für einen späteren Cluster-Einsatz: `API_UPSTREAM` auf `<service>.<namespace>:3399` setzen,
 `BASE_PATH` als Build-Argument, falls die Anwendung unter einem Unterpfad hängen soll.
 
