@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import type { TeamMember } from '../shared/types.js'
 import { parseAbsences, type Absence, type MemberAbsence } from './absence.js'
 
@@ -171,6 +171,26 @@ export function parseConfig(raw: unknown): DashboardConfig {
   }
 }
 
-export function loadConfig(path = process.env.DASHBOARD_CONFIG ?? './dashboard.config.json') {
-  return parseConfig(JSON.parse(readFileSync(path, 'utf8')))
+const LOCAL_CONFIG = './dashboard.config.local.json'
+const SHIPPED_CONFIG = './dashboard.config.json'
+
+export interface ConfigSource {
+  env?: Record<string, string | undefined>
+  read?: (path: string) => string
+  exists?: (path: string) => boolean
+}
+
+export function readConfigText({
+  env = process.env,
+  read = (path: string) => readFileSync(path, 'utf8'),
+  exists = (path: string) => existsSync(path),
+}: ConfigSource = {}) {
+  const inline = env.DASHBOARD_CONFIG_JSON
+  if (inline && inline.trim()) return inline
+  if (env.DASHBOARD_CONFIG) return read(env.DASHBOARD_CONFIG)
+  return read(exists(LOCAL_CONFIG) ? LOCAL_CONFIG : SHIPPED_CONFIG)
+}
+
+export function loadConfig(source: ConfigSource = {}) {
+  return parseConfig(JSON.parse(readConfigText(source)))
 }

@@ -9,6 +9,9 @@ dist-server
 
 # Secrets. They reach the container through environment variables at run time.
 .env*
+# The real config names people and internal hosts; in the cluster it arrives as
+# DASHBOARD_CONFIG_JSON, so it must never be baked into an image.
+dashboard.config.local.json
 
 # Nothing here is COPYd by either Dockerfile.
 .git

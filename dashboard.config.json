@@ -1,40 +1,25 @@
 {
   "gitlab": {
-    "baseUrl": "https://source.ceyoniq.com",
-    "groups": ["ceyoniq/fe/ki"],
+    "baseUrl": "https://gitlab.example.com",
+    "groups": ["example-group"],
     "includeSubgroups": true,
-    "exclude": [
-      "ceyoniq/fe/ki/ki-helm-chart",
-      "ceyoniq/fe/ki/oobabooga*",
-      "ceyoniq/fe/ki/ki-nappl-prod",
-      "ceyoniq/fe/ki/embedding",
-      "ceyoniq/fe/ki/vllm-stack",
-      "ceyoniq/fe/ki/ai-ci-jobs",
-      "ceyoniq/fe/ki/ai-docu",
-      "ceyoniq/fe/ki/helm-git-publisher",
-      "ceyoniq/fe/ki/ki-backend-client",
-      "ceyoniq/fe/ki/ki-cluster",
-      "ceyoniq/fe/ki/stack-it-sdk",
-      "ceyoniq/fe/ki/stack-it-zero-scaler",
-      "ceyoniq/fe/ki/zitadel-api-client",
-      "ceyoniq/fe/ki/zitadeloauthtokenrequester"
-    ],
+    "exclude": [],
     "staleAfterDays": 14,
     "includeArchived": false,
     "hideWithoutPipeline": true,
     "forceGood": []
   },
   "jira": {
-    "baseUrl": "https://devtickets.ceyoniq.com",
+    "baseUrl": "https://jira.example.com",
     "flavor": "server",
-    "boardId": 253,
+    "boardId": null,
     "jql": null,
     "storyPointsField": null,
     "doneStatusCategories": ["done"],
     "doingStatusCategories": ["indeterminate"],
     "weekComponents": ["Woche 1", "Woche 2"],
-    "epicsBoardId": 96,
-    "epicsJql": "issuekey in (PRO-3970, PRO-3883, PRO-3957)",
+    "epicsBoardId": null,
+    "epicsJql": null,
     "epicsStatusCategories": ["indeterminate"],
     "epicsLimit": 4,
     "laneStatus": {
@@ -48,16 +33,12 @@
     "absenceLookaheadDays": 14
   },
   "team": [
-    { "name": "Timo", "away": null, "gitlabUser": false, "email": "T.Krause@ceyoniq.com" },
-    { "name": "Julien", "away": null, "gitlabUser": true , "email": "J.Beck@ceyoniq.com"},
-    { "name": "Daniel", "away": null, "gitlabUser": false, "email": "D.Dietrich@ceyoniq.com" },
-    { "name": "Saverio", "away": null, "gitlabUser": false, "email": "S.Mancuso@ceyoniq.com" }
+    { "name": "Alice", "away": null, "gitlabUser": true, "email": "alice@example.com" },
+    { "name": "Bob", "away": null, "gitlabUser": false, "email": "bob@example.com" }
   ],
-  "absences": [
-    { "member": "Daniel", "from": "2026-10-26", "to": "2026-10-30" }
-  ],
+  "absences": [],
   "calendar": {
-    "sources": [{ "member": "J. Beck", "env": "CALENDAR_ICS_URL", "own": true  }],
+    "sources": [{ "member": "Alice", "env": "CALENDAR_ICS_URL", "own": true }],
     "absenceKeywords": ["urlaub", "abwesend", "frei", "krank", "ooo", "out of office"]
   },
   "activity": {

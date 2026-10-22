@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { forBoard, parseConfig } from './config.js'
+import { forBoard, parseConfig, readConfigText } from './config.js'
 
 const present = { away: null, nextAway: null }
 
@@ -187,5 +187,56 @@ describe('parseConfig', () => {
   it('keeps a configured board id as a number', () => {
     expect(parseConfig({ jira: { boardId: '42' } }).jira.boardId).toBe(42)
     expect(parseConfig({ jira: {} }).jira.boardId).toBeNull()
+  })
+})
+
+describe('readConfigText', () => {
+  const never = (path: string) => {
+    throw new Error(`should not have read ${path}`)
+  }
+
+  it('prefers the inline config over every file', () => {
+    const text = readConfigText({
+      env: { DASHBOARD_CONFIG_JSON: '{"refreshSeconds":5}', DASHBOARD_CONFIG: './other.json' },
+      read: never,
+      exists: () => true,
+    })
+    expect(JSON.parse(text).refreshSeconds).toBe(5)
+  })
+
+  it('falls through a blank inline config to the file', () => {
+    const text = readConfigText({
+      env: { DASHBOARD_CONFIG_JSON: '   ' },
+      read: (path) => `read:${path}`,
+      exists: () => false,
+    })
+    expect(text).toBe('read:./dashboard.config.json')
+  })
+
+  it('reads the explicit path before any default', () => {
+    const text = readConfigText({
+      env: { DASHBOARD_CONFIG: '/config/dashboard.config.json' },
+      read: (path) => `read:${path}`,
+      exists: () => true,
+    })
+    expect(text).toBe('read:/config/dashboard.config.json')
+  })
+
+  it('takes the untracked local config when it exists', () => {
+    const text = readConfigText({
+      env: {},
+      read: (path) => `read:${path}`,
+      exists: (path) => path === './dashboard.config.local.json',
+    })
+    expect(text).toBe('read:./dashboard.config.local.json')
+  })
+
+  it('falls back to the shipped config when no local one exists', () => {
+    const text = readConfigText({
+      env: {},
+      read: (path) => `read:${path}`,
+      exists: () => false,
+    })
+    expect(text).toBe('read:./dashboard.config.json')
   })
 })

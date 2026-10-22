@@ -71,8 +71,9 @@ Zwei bewusste Grenzen:
 ## Einrichten
 
 ```bash
-cp .env.example .env          # GITLAB_TOKEN eintragen (Scope read_api)
-$EDITOR dashboard.config.json # Gruppe, Ausschlussliste, Jira-Adresse, Team
+cp .env.example .env                                      # GITLAB_TOKEN eintragen (Scope read_api)
+cp dashboard.config.json dashboard.config.local.json      # Gruppe, Ausschlussliste, Jira-Adresse, Team
+$EDITOR dashboard.config.local.json
 npm install
 npm run dev                   # http://localhost:5180
 ```
@@ -122,7 +123,13 @@ Für einen späteren Cluster-Einsatz: `API_UPSTREAM` auf `<service>.<namespace>:
 
 ## Konfiguration
 
-`dashboard.config.json`, ohne Geheimnisse, versionierbar.
+Gelesen wird, in dieser Reihenfolge: `DASHBOARD_CONFIG_JSON` (die ganze Konfiguration als
+Umgebungsvariable — so kommt sie im Cluster an), `DASHBOARD_CONFIG` (Pfad),
+`dashboard.config.local.json`, `dashboard.config.json`.
+
+Die eingecheckte `dashboard.config.json` ist ein **Beispiel mit neutralen Werten**. Namen,
+Mailadressen und interne Adressen gehören in die nicht versionierte
+`dashboard.config.local.json` — dieses Repository ist öffentlich.
 
 | Schlüssel | Wirkung |
 |---|---|
