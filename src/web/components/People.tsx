@@ -166,13 +166,13 @@ export function People({ team, commits, calendar }: Props) {
                 <ul className="mt-1 ml-[34px] grid gap-0.5 border-l border-rule pl-2.5" role="list">
                   {pushes.map((commit) => (
                     <Line
-                      key={`c-${commit.at}-${commit.title}`}
+                      key={`c-${commit.project}-${commit.at}`}
                       icon={<IconMerge className="text-[11px]" />}
                       lead={commit.project}
                       text={commit.title}
                       trail={commit.count > 1 ? `×${commit.count}` : undefined}
                       dim={false}
-                      title={`${commit.project}${commit.ref ? ` · ${commit.ref}` : ''} · ${commit.count} Commits`}
+                      title={`${commit.project}${commit.ref ? ` · ${commit.ref}` : ''} · ${commit.count} Commits, zuletzt „${commit.title}"`}
                     />
                   ))}
                   {agenda.map(({ entry, yesterday }) => (

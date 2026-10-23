@@ -14,10 +14,21 @@ export interface PushEvent {
   }
 }
 
-export function sinceOf(now: Date, days: number): string {
-  const since = new Date(now.getFullYear(), now.getMonth(), now.getDate() - days)
+export const cutoffOf = (now: Date, hours: number) =>
+  new Date(now.getTime() - hours * 3_600_000)
+
+export function sinceOf(now: Date, hours: number): string {
+  const cutoff = cutoffOf(now, hours)
+  const day = new Date(cutoff.getFullYear(), cutoff.getMonth(), cutoff.getDate() - 1)
   const pad = (value: number) => String(value).padStart(2, '0')
-  return `${since.getFullYear()}-${pad(since.getMonth() + 1)}-${pad(since.getDate())}`
+  return `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`
+}
+
+export function eventsInWindow(events: readonly PushEvent[], cutoff: Date): PushEvent[] {
+  return events.filter((event) => {
+    if (!event.push_data?.commit_title) return false
+    return Date.parse(event.created_at) >= cutoff.getTime()
+  })
 }
 
 export function toCommitRows(
@@ -25,16 +36,32 @@ export function toCommitRows(
   projectNames: ReadonlyMap<number, string>,
   limit: number,
 ): CommitRow[] {
-  return events
-    .filter((event) => Boolean(event.push_data?.commit_title))
-    .map((event) => ({
-      title: String(event.push_data!.commit_title),
-      project: projectNames.get(event.project_id ?? -1) ?? '—',
+  const groups = new Map<number, CommitRow>()
+
+  for (const event of events) {
+    const title = event.push_data?.commit_title
+    if (!title) continue
+
+    const id = event.project_id ?? -1
+    const previous = groups.get(id)
+    const count = (previous?.count ?? 0) + (event.push_data?.commit_count ?? 1)
+
+    if (previous && Date.parse(previous.at) >= Date.parse(event.created_at)) {
+      groups.set(id, { ...previous, count })
+      continue
+    }
+
+    groups.set(id, {
+      title: String(title),
+      project: projectNames.get(id) ?? '—',
       ref: event.push_data?.ref ?? null,
-      count: event.push_data?.commit_count ?? 1,
+      count,
       at: event.created_at,
-    }))
-    .sort((a, b) => b.at.localeCompare(a.at))
+    })
+  }
+
+  return [...groups.values()]
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
     .slice(0, limit)
 }
 
@@ -94,10 +121,12 @@ export async function fetchCommits(
   token: string,
   deps: GitlabDeps,
   members: readonly { name: string; gitlabUser: string | null; self: boolean }[],
-  days: number,
+  hours: number,
   limit: number,
 ): Promise<Record<string, CommitRow[]>> {
-  const since = sinceOf(deps.now(), days)
+  const now = deps.now()
+  const cutoff = cutoffOf(now, hours)
+  const since = sinceOf(now, hours)
   const projects = await rest<{ id: number; name: string }[]>(
     config,
     token,
@@ -111,7 +140,7 @@ export async function fetchCommits(
       const path = eventPath(member, since)
       if (path === null) return [member.name, [] as PushEvent[]] as const
       const events = await rest<PushEvent[]>(config, token, deps, path).catch(() => [])
-      return [member.name, events] as const
+      return [member.name, eventsInWindow(events, cutoff)] as const
     }),
   )
 

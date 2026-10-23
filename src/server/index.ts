@@ -113,7 +113,7 @@ app.get('/api/commits', async () => {
       gitlabToken,
       deps,
       config.team,
-      config.activity.days,
+      config.activity.hours,
       config.activity.perMember,
     ),
   )

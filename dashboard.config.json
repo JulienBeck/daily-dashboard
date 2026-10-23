@@ -42,7 +42,7 @@
     "absenceKeywords": ["urlaub", "abwesend", "frei", "krank", "ooo", "out of office"]
   },
   "activity": {
-    "days": 1,
+    "hours": 36,
     "perMember": 5
   },
   "refreshSeconds": 60,

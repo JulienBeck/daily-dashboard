@@ -176,10 +176,10 @@ describe('parseConfig', () => {
     expect(parseConfig({ team: [{ name: 'Timo', gitlabUser: '' }] }).team[0]!.gitlabUser).toBeNull()
   })
 
-  it('fills the activity window with defaults', () => {
-    expect(parseConfig({}).activity).toEqual({ days: 1, perMember: 5 })
-    expect(parseConfig({ activity: { days: 3, perMember: 2 } }).activity).toEqual({
-      days: 3,
+  it('looks back a day and a half unless told otherwise', () => {
+    expect(parseConfig({}).activity).toEqual({ hours: 36, perMember: 5 })
+    expect(parseConfig({ activity: { hours: 72, perMember: 2 } }).activity).toEqual({
+      hours: 72,
       perMember: 2,
     })
   })

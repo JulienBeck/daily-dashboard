@@ -16,6 +16,12 @@ export function Timer() {
 
   const toggle = useCallback(() => setRunning((value) => !value), [])
 
+  const reset = useCallback(() => {
+    setLeft(TOTAL)
+    setRunning(false)
+    setAlarm(false)
+  }, [])
+
   useEffect(() => {
     if (!running) return
     const timer = setInterval(() => setLeft((value) => Math.max(0, value - 1)), 1000)
@@ -65,9 +71,7 @@ export function Timer() {
       ) : null}
       <button
         type="button"
-        onClick={() =>
-          left === 0 ? (setLeft(TOTAL), setRunning(false), setAlarm(false)) : toggle()
-        }
+        onClick={() => (left === 0 ? reset() : toggle())}
         title="Leertaste startet und pausiert"
         className="rounded-md border border-white/10 bg-card px-3 py-1 text-xs text-ink-2 hover:border-accent hover:text-ink"
       >

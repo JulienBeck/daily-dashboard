@@ -70,7 +70,7 @@ export interface DashboardConfig {
   team: ConfigMember[]
   absences: Absence[]
   calendar: CalendarConfig
-  activity: { days: number; perMember: number }
+  activity: { hours: number; perMember: number }
   refreshSeconds: number
   cacheSeconds: { gitlab: number; jira: number; calendar: number }
 }
@@ -159,7 +159,7 @@ export function parseConfig(raw: unknown): DashboardConfig {
         : ['urlaub', 'abwesend', 'frei', 'krank', 'ooo', 'out of office'],
     },
     activity: {
-      days: Number(activity.days ?? 1),
+      hours: Number(activity.hours ?? 36),
       perMember: Number(activity.perMember ?? 5),
     },
     refreshSeconds: Number(source.refreshSeconds ?? 60),

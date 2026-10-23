@@ -203,7 +203,7 @@ Merge-Request-Läufe und externe Läufe bleiben außen vor — die gehören nich
 | `jira.epicsLimit` | wie viele Epics oben Platz haben (3–4) |
 | `jira.laneStatus` | je Spalte eine Liste von **Zielstatus-Namen** für das Verschieben per Drag-and-drop. Leer gelassen nimmt der Proxy den ersten passenden Übergang — siehe „Stories verschieben" |
 | `team[].email` | Dienstliche Adresse, mit der die Person in den angebundenen Systemen gefunden wird — heute das Jira-Profilbild. Weggelassen sucht der Proxy nach `name` und nimmt den Treffer nur, wenn er eindeutig ist. Ein Jira-Benutzername tut es auch, die Suche nimmt beides |
-| `activity.days` / `activity.perMember` | Rückblick in Tagen und wie viele Pushes je Person unter dem Namen stehen |
+| `activity.hours` / `activity.perMember` | Rückblick in **Stunden** (Vorgabe 36) und wie viele **Repositories** je Person unter dem Namen stehen — siehe „Was habe ich gestern gemacht" |
 | `calendar.sources` | je Person ein Eintrag `{ member, env, own }`. `env` nennt die **Umgebungsvariable**, in der die ICS-Adresse steht — die Adresse selbst bleibt in der `.env`, weil sie das Geheimnis ist |
 | `calendar.absenceKeywords` | ganztägige Termine mit einem dieser Wörter im Titel gelten als Abwesenheit und überschreiben `team[].away` |
 | `absences` | handgepflegte Urlaubsliste mit Zeitraum — siehe „Urlaube eintragen" |
@@ -248,6 +248,29 @@ der Container in UTC und der Urlaub wechselte im Sommer um 02:00 statt um Mitter
 Die Liste wird bei **jedem** `/api/board` neu ausgewertet, nicht zwischengespeichert; eine
 geänderte `dashboard.config.json` braucht allerdings einen Neustart des Proxy, weil sie beim
 Start gelesen wird.
+
+## Was habe ich gestern gemacht
+
+Unter jedem Namen stehen die Repositories, in denen diese Person zuletzt gearbeitet hat —
+**eine Zeile je Repository**, nicht je Push. Darin der Titel des jüngsten Commits, und rechts
+`×n`, wenn mehr als einer dazugehört. Für das Daily reicht das: der Name des Repositories genügt,
+um sich zu erinnern, worum es ging.
+
+Das Fenster ist `activity.hours`, Vorgabe **36 Stunden**. Nicht 24: wer um 9:00 vor dem Board
+steht, will den gestrigen Nachmittag sehen, und der liegt dann schon 18 Stunden zurück. 36 reicht
+auch am Montag nicht bis Freitag — wer das will, setzt 72.
+
+**Die Falle dabei:** GitLabs `after=` in `/events` ist **tagesgenau und ausschließend**.
+`after=2026-10-22` liefert erst Ereignisse ab dem 23. Wer dort das Datum von „heute minus ein Tag"
+einsetzt, bekommt damit **nur den heutigen Tag** — und merkt es nicht, weil es am Tag des Schreibens
+richtig aussieht. Deshalb zwei Stufen:
+
+| Stufe | Wo | Was |
+|---|---|---|
+| Vorfilter | `sinceOf` | fragt GitLab einen Tag **vor** dem Stundenschnitt, um die ausschließende Grenze zu überspringen |
+| Schnitt | `eventsInWindow` | wirft danach alles weg, was älter als `cutoffOf(now, hours)` ist — auf die Minute |
+
+Die API-Seite darf also großzügig sein; genau ist erst der zweite Schritt.
 
 ## Stories verschieben
 
