@@ -50,6 +50,7 @@ query Mrs($fullPath: ID!, $includeSubgroups: Boolean!) {
 export interface GitlabDeps {
   fetch: typeof fetch
   now: () => Date
+  log?: (message: string) => void
 }
 
 async function graphql<T>(config: GitlabConfig, token: string, deps: GitlabDeps, query: string, variables: unknown): Promise<T> {

@@ -138,9 +138,28 @@ export async function fetchCommits(
   const pushes = await Promise.all(
     members.map(async (member) => {
       const path = eventPath(member, since)
-      if (path === null) return [member.name, [] as PushEvent[]] as const
-      const events = await rest<PushEvent[]>(config, token, deps, path).catch(() => [])
-      return [member.name, eventsInWindow(events, cutoff)] as const
+      if (path === null) {
+        deps.log?.(`GitLab: ${member.name} hat keinen gitlabUser, keine Commits geholt`)
+        return [member.name, [] as PushEvent[]] as const
+      }
+
+      const events = await rest<PushEvent[]>(config, token, deps, path).catch((error: unknown) => {
+        deps.log?.(`GitLab: Commits für ${member.name} nicht lesbar (${String(error)})`)
+        return [] as PushEvent[]
+      })
+
+      const inWindow = eventsInWindow(events, cutoff)
+      if (events.length === 0) {
+        deps.log?.(
+          member.self
+            ? `GitLab: /events ist leer — gehört der Token wirklich ${member.name}? Ein Gruppen-Token liefert hier die Ereignisse seines Bot-Benutzers`
+            : `GitLab: /users/${member.gitlabUser}/events ist leer — Benutzername richtig geschrieben?`,
+        )
+      } else if (inWindow.length === 0) {
+        deps.log?.(`GitLab: ${member.name} hat ${events.length} Pushes, aber keinen im Fenster`)
+      }
+
+      return [member.name, inWindow] as const
     }),
   )
 

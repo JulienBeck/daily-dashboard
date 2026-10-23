@@ -138,6 +138,7 @@ fertig. Die Tokens kommen aus `.env` neben der Compose-Datei.
 |---|---|
 | `TZ` | entscheidet, welcher Tag „heute" ist — Vorgabe `Europe/Berlin`. Node bringt seine eigene Zeitzonendatenbank mit, im Alpine-Image muss dafür kein `tzdata` nachinstalliert werden |
 | `CALENDAR_ICS_URL` | wird durchgereicht, weil `calendar.sources[].env` sie nennt. Fehlt sie, bleibt nur dieses Panel leer |
+| `DASHBOARD_CONFIG_FILE` | welche Datei gemountet wird. **Ohne sie ist es die Beispieldatei** mit `Alice`, `Bob` und `example-group` — das Board bleibt dann leer. Für echte Daten auf `./dashboard.config.local.json` zeigen |
 | `DOCKER_SUBNET` | Notausgang, Vorgabe `172.28.0.0/24` — siehe unten |
 
 **Kein freier Adresspool.** Scheitert `docker compose up` an

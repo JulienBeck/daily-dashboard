@@ -142,6 +142,77 @@ describe('fetchCommits', () => {
   })
 })
 
+describe('fetchCommits logging', () => {
+  const config = { baseUrl: 'https://git.example.com' } as never
+  const ok = (body: unknown) => ({ ok: true, json: async () => body })
+
+  const run = async (
+    members: { name: string; gitlabUser: string | null; self: boolean }[],
+    fetchMock: ReturnType<typeof vi.fn>,
+  ) => {
+    const lines: string[] = []
+    await fetchCommits(
+      config,
+      't',
+      { fetch: fetchMock as never, now: () => new Date(2026, 9, 19), log: (m) => lines.push(m) },
+      members,
+      36,
+      5,
+    )
+    return lines.join('\n')
+  }
+
+  it('says so when a member has no gitlab user at all', async () => {
+    const lines = await run(
+      [{ name: 'Timo', gitlabUser: null, self: false }],
+      vi.fn().mockResolvedValue(ok([])),
+    )
+    expect(lines).toContain('Timo')
+    expect(lines).toContain('keinen gitlabUser')
+  })
+
+  it('suspects a group token out loud when the own event feed is empty', async () => {
+    const lines = await run(
+      [{ name: 'Julien', gitlabUser: null, self: true }],
+      vi.fn().mockResolvedValue(ok([])),
+    )
+    expect(lines).toContain('Bot-Benutzer')
+  })
+
+  it('names the queried username when a foreign feed is empty', async () => {
+    const lines = await run(
+      [{ name: 'Timo', gitlabUser: 'timo', self: false }],
+      vi.fn().mockResolvedValue(ok([])),
+    )
+    expect(lines).toContain('/users/timo/events')
+  })
+
+  it('reports a failing request instead of swallowing it', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok([]))
+      .mockResolvedValueOnce({ ok: false, status: 404, statusText: 'Not Found' })
+    const lines = await run([{ name: 'Timo', gitlabUser: 'tippfehler', self: false }], fetchMock)
+    expect(lines).toContain('nicht lesbar')
+    expect(lines).toContain('404')
+  })
+
+  it('separates "nothing pushed" from "nothing recent"', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok([]))
+      .mockResolvedValueOnce(ok([push({ created_at: '2020-01-01T09:00:00.000Z' })]))
+    const lines = await run([{ name: 'Timo', gitlabUser: 'timo', self: false }], fetchMock)
+    expect(lines).toContain('keinen im Fenster')
+  })
+
+  it('stays quiet when there is something to show', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(ok([])).mockResolvedValueOnce(ok([push()]))
+    const lines = await run([{ name: 'Timo', gitlabUser: 'timo', self: false }], fetchMock)
+    expect(lines).toBe('')
+  })
+})
+
 describe('missingProjectIds', () => {
   it('names the projects the membership list does not cover', () => {
     expect(missingProjectIds([push({ project_id: 99 })], names)).toEqual([99])

@@ -88,7 +88,7 @@ export function People({ team, commits, calendar }: Props) {
     <section className="panel grid min-h-0 grid-rows-[auto_1fr]">
       <div className="panel-head">
         <IconPeople className="text-sm" />
-        <span className="flex-1">Heute im Daily</span>
+        <span className="flex-1">Team</span>
         <span className="num normal-case">
           {present} / {team.length}
         </span>

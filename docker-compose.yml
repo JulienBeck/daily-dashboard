@@ -15,8 +15,10 @@ services:
       CALENDAR_ICS_URL: ${CALENDAR_ICS_URL:-}
       DASHBOARD_CONFIG: /config/dashboard.config.json
     volumes:
-      # Mounted, not baked in: edit the file and restart, no rebuild.
-      - ./dashboard.config.json:/config/dashboard.config.json:ro
+      # Mounted, not baked in: edit the file and restart, no rebuild. The default
+      # is the example config; point DASHBOARD_CONFIG_FILE at your own file
+      # (dashboard.config.local.json) to run the container on real data.
+      - ${DASHBOARD_CONFIG_FILE:-./dashboard.config.json}:/config/dashboard.config.json:ro
     restart: unless-stopped
 
   web:
