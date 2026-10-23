@@ -82,4 +82,66 @@ describe('Timer', () => {
     tick(5000)
     expect(screen.getByText('14:58')).toBeInTheDocument()
   })
+
+  it('stays quiet while the timebox still runs', () => {
+    render(<Timer />)
+
+    press('Start')
+    tick(1000 * 899)
+    expect(screen.getByText('00:01')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('raises the frame the moment it hits zero', () => {
+    render(<Timer />)
+
+    press('Start')
+    tick(1000 * 900)
+
+    expect(screen.getByText('00:00')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveClass('alarm-frame')
+  })
+
+  it('takes the frame away once it has blinked', () => {
+    render(<Timer />)
+
+    press('Start')
+    tick(1000 * 1000)
+    act(() => void fireEvent.animationEnd(screen.getByRole('alert')))
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('does not raise the frame a second time by itself', () => {
+    render(<Timer />)
+
+    press('Start')
+    tick(1000 * 1000)
+    act(() => void fireEvent.animationEnd(screen.getByRole('alert')))
+    tick(1000 * 10)
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('clears the frame when the timebox is reset', () => {
+    render(<Timer />)
+
+    press('Start')
+    tick(1000 * 1000)
+    press('Zurücksetzen')
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('raises the frame again after a reset and a second run', () => {
+    render(<Timer />)
+
+    press('Start')
+    tick(1000 * 1000)
+    press('Zurücksetzen')
+    press('Start')
+    tick(1000 * 1000)
+
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+  })
 })

@@ -47,26 +47,66 @@ anders aus — dann die Adresse durch den Jira-Benutzernamen ersetzen, `email` n
 **Die Adresse verlässt den Proxy nicht.** `/api/board` liefert Name, Kürzel, Abwesenheit und
 Bildadresse — `email` wird dort abgeschnitten (`forBoard` in `src/server/index.ts`).
 
-## Kalender
-
-Aus einem **veröffentlichten ICS-Link** (Outlook Web → Kalender → Veröffentlichen). Keine
-App-Registrierung, keine Admin-Freigabe. Der Parser steckt in `src/server/ics.ts` und kann
-Serientermine auflösen: `FREQ` täglich/wöchentlich/monatlich/jährlich, `INTERVAL`, `BYDAY`,
-`COUNT`, `UNTIL` und abgesagte Einzeltermine über `EXDATE`.
-
-Zwei bewusste Grenzen:
-
-- **Zeitzonen**: nur ein abschließendes `Z` wird als UTC gelesen. Eine `TZID`, die wir nicht
-  auflösen können, gilt als Ortszeit — das Board läuft in derselben Zeitzone wie der Kalender.
-- **Die ICS-Adresse ist das Geheimnis.** Wer sie hat, liest den Kalender. Sie gehört in die `.env`
-  und nirgendwo sonst hin.
-
 | Pfad | Inhalt |
 |---|---|
 | `src/shared/` | Saison- und Ampellogik, ohne IO, von beiden Seiten genutzt |
 | `src/server/` | Fastify-Proxy, GitLab- und Jira-Anbindung, Cache |
 | `src/web/` | React-Oberfläche, Icons, Komponenten |
 | `design/` | Entwurf, Mockup, Farbvalidator |
+
+Ausgerollt wird nicht aus diesem Repository: das macht `daily-dashboard-kube` auf
+`source.ceyoniq.com`. Dort liegen die echte Konfiguration, die Tokens und die Manifeste —
+dieses Repository ist öffentlich und darf nichts davon enthalten.
+
+## Kalender
+
+**Stand 2026-10-23: nicht angebunden.** Das Panel bleibt leer, Abwesenheiten kommen aus der
+Handliste `absences` (siehe „Urlaube eintragen").
+
+### Warum der ICS-Weg ausfällt
+
+Gebaut ist er für einen **veröffentlichten ICS-Link** (Outlook Web → Kalender → Veröffentlichen).
+Den Knopf gibt es in unserem Tenant nicht, und laut IT soll es ihn auch nicht geben. Das ist
+nachvollziehbar: ein veröffentlichter Link ist **unauthentifiziert** — wer ihn hat, liest den
+Kalender, ohne sich anzumelden, ohne Protokoll und ohne Entzugsmöglichkeit außer dem Wechsel der
+Adresse. Nicht weiter darauf drängen; der Weg unten ist der bessere Antrag.
+
+Der Code bleibt, er ist nicht das Problem: `src/server/ics.ts` löst Serientermine auf (`FREQ`
+täglich/wöchentlich/monatlich/jährlich, `INTERVAL`, `BYDAY`, `COUNT`, `UNTIL`, abgesagte
+Einzeltermine über `EXDATE`). Steht irgendwann eine ICS-Adresse zur Verfügung — ein fremder
+Kalender, ein Raumkalender, ein Export —, genügt weiterhin `CALENDAR_ICS_URL`.
+
+Zwei bewusste Grenzen dieses Parsers:
+
+- **Zeitzonen**: nur ein abschließendes `Z` wird als UTC gelesen. Eine `TZID`, die wir nicht
+  auflösen können, gilt als Ortszeit — das Board läuft in derselben Zeitzone wie der Kalender.
+- **Die ICS-Adresse ist das Geheimnis.** Wer sie hat, liest den Kalender. Sie gehört in die `.env`
+  und nirgendwo sonst hin.
+
+### Der eingeschlagene Weg: Microsoft Graph
+
+Entschieden am 2026-10-23, **noch nicht gebaut**. Der Proxy holt sich selbst ein Token und liest
+je Teammitglied `/v1.0/users/<mail>/calendarView`. Serientermine löst Graph selbst auf, der
+ICS-Parser wird dafür nicht gebraucht.
+
+Was die IT anlegen muss — genau das und nicht mehr:
+
+| Schritt | Inhalt |
+|---|---|
+| App-Registrierung | nur für die eigene Organisation, kein Redirect nötig |
+| Anwendungsberechtigung | `Calendars.Read` (**nicht** delegiert) samt Admin-Consent |
+| Eingrenzung | `New-ApplicationAccessPolicy` auf genau die Postfächer aus `team[].email` |
+
+Die Eingrenzung ist das Argument für den Antrag: ohne sie dürfte die App **jedes** Postfach im
+Tenant lesen, mit ihr genau vier. Das ist nachweislich enger als ein veröffentlichter Link und
+jederzeit entziehbar.
+
+Zurück kommen drei Werte — Tenant-ID, Client-ID, Client-Secret. Die ersten beiden sind keine
+Geheimnisse, das Secret schon und es verfällt; es gehört zu den Tokens, nicht in `config/`.
+
+Offen, bis die Freigabe da ist: `src/server/graph.ts` gibt es noch nicht, `calendar.sources`
+kennt noch keinen Graph-Typ, und `daily-dashboard-kube` reicht bislang nur `CALENDAR_ICS_URL`
+durch.
 
 ## Einrichten
 

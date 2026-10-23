@@ -12,22 +12,21 @@ export function formatClock(seconds: number): string {
 export function Timer() {
   const [left, setLeft] = useState(TOTAL)
   const [running, setRunning] = useState(false)
+  const [alarm, setAlarm] = useState(false)
 
   const toggle = useCallback(() => setRunning((value) => !value), [])
 
   useEffect(() => {
     if (!running) return
-    const timer = setInterval(() => {
-      setLeft((value) => {
-        if (value <= 1) {
-          setRunning(false)
-          return 0
-        }
-        return value - 1
-      })
-    }, 1000)
+    const timer = setInterval(() => setLeft((value) => Math.max(0, value - 1)), 1000)
     return () => clearInterval(timer)
   }, [running])
+
+  useEffect(() => {
+    if (left > 0) return
+    setRunning(false)
+    setAlarm(true)
+  }, [left])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -56,9 +55,19 @@ export function Timer() {
         <span className="absolute inset-[5px] rounded-full bg-surface" />
         <span className="num relative text-[12px] font-bold">{formatClock(left)}</span>
       </div>
+      {alarm ? (
+        <div
+          className="alarm-frame"
+          role="alert"
+          aria-label="Timebox abgelaufen"
+          onAnimationEnd={() => setAlarm(false)}
+        />
+      ) : null}
       <button
         type="button"
-        onClick={() => (left === 0 ? (setLeft(TOTAL), setRunning(false)) : toggle())}
+        onClick={() =>
+          left === 0 ? (setLeft(TOTAL), setRunning(false), setAlarm(false)) : toggle()
+        }
         title="Leertaste startet und pausiert"
         className="rounded-md border border-white/10 bg-card px-3 py-1 text-xs text-ink-2 hover:border-accent hover:text-ink"
       >

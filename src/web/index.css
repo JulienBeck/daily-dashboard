@@ -27,13 +27,16 @@
   --step-3: #566670;
 
   --accent: #d2691e;
+  /* Same hue as --accent, kept as channels so the glow below can set its own
+     alpha without color-mix. See the body::before note. */
+  --accent-rgb: 210 105 30;
 }
 
 /* Hue taken from the artwork, lifted until it clears 3:1 on the surface. */
-:root[data-season='spring'] { --accent: #a8d48a; }
-:root[data-season='summer'] { --accent: #f4c13e; }
-:root[data-season='autumn'] { --accent: #d2691e; }
-:root[data-season='winter'] { --accent: #8ec8e0; }
+:root[data-season='spring'] { --accent: #a8d48a; --accent-rgb: 168 212 138; }
+:root[data-season='summer'] { --accent: #f4c13e; --accent-rgb: 244 193 62; }
+:root[data-season='autumn'] { --accent: #d2691e; --accent-rgb: 210 105 30; }
+:root[data-season='winter'] { --accent: #8ec8e0; --accent-rgb: 142 200 224; }
 
 @theme {
   --color-plane: var(--plane);
@@ -74,9 +77,12 @@ body::before {
   inset: 0;
   pointer-events: none;
   z-index: 0;
+  /* No color-mix here on purpose: the build emits a full-strength var(--accent)
+     fallback for browsers without it, which paints a solid block instead of a
+     glow. Plain alpha renders the same everywhere. */
   background:
-    radial-gradient(1400px 700px at 50% -20%, color-mix(in oklab, var(--accent) 8%, transparent), transparent 70%),
-    radial-gradient(900px 500px at 100% 110%, color-mix(in oklab, var(--accent) 5%, transparent), transparent 70%);
+    radial-gradient(1400px 700px at 50% -20%, rgb(var(--accent-rgb) / 0.12), transparent 70%),
+    radial-gradient(900px 500px at 100% 110%, rgb(var(--accent-rgb) / 0.2), transparent 70%);
   transition: background 0.6s ease;
 }
 
@@ -122,5 +128,39 @@ body::before {
 @media (prefers-reduced-motion: reduce) {
   .pulse {
     animation: none;
+  }
+}
+
+@keyframes dash-alarm {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Holds the frame still for the same 1.8s, so animationend still fires and the
+   element removes itself. Plain "animation: none" would leave it on screen. */
+@keyframes dash-alarm-steady {
+  from,
+  to {
+    opacity: 1;
+  }
+}
+
+.alarm-frame {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  border: 6px solid var(--critical);
+  animation: dash-alarm 0.6s ease-in-out 3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alarm-frame {
+    animation-name: dash-alarm-steady;
   }
 }
