@@ -3,6 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      The board brings its own dark theme. Without these two a dark-mode add-on
+      recolours every text to its own grey, which wrecks the season palette and
+      the traffic light. color-scheme tells the browser, darkreader-lock is
+      Dark Reader's documented opt-out.
+    -->
+    <meta name="color-scheme" content="dark" />
+    <meta name="darkreader-lock" />
     <!-- Relative, so vite hashes it into assets/ and BASE_PATH keeps working. -->
     <link rel="icon" type="image/jpeg" href="./pics/Icon.jpg" />
     <title>Daily-Dashboard</title>
