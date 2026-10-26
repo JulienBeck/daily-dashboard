@@ -70,7 +70,7 @@ export interface DashboardConfig {
   team: ConfigMember[]
   absences: Absence[]
   calendar: CalendarConfig
-  activity: { hours: number; perMember: number }
+  activity: { hours: number; perMember: number; sinceLastWorkday: boolean }
   refreshSeconds: number
   cacheSeconds: { gitlab: number; jira: number; calendar: number }
 }
@@ -161,6 +161,7 @@ export function parseConfig(raw: unknown): DashboardConfig {
     activity: {
       hours: Number(activity.hours ?? 36),
       perMember: Number(activity.perMember ?? 5),
+      sinceLastWorkday: activity.sinceLastWorkday !== false,
     },
     refreshSeconds: Number(source.refreshSeconds ?? 60),
     cacheSeconds: {

@@ -4,6 +4,7 @@ import {
   eventPath,
   eventsInWindow,
   fetchCommits,
+  lastWorkdayStart,
   missingProjectIds,
   sinceOf,
   toCommitRows,
@@ -30,6 +31,50 @@ describe('cutoffOf', () => {
   it('reaches yesterday morning from today at nine', () => {
     expect(cutoffOf(new Date(2026, 9, 23, 9, 0), 36).getDate()).toBe(21)
   })
+
+  it('leaves the weekend alone when nobody asked for it', () => {
+    expect(cutoffOf(MONDAY, 36)).toEqual(new Date(2026, 9, 31, 21, 0))
+  })
+})
+
+// Monday 2026-11-02; the week before carries the end of summer time, which
+// shifts every literal by an hour and has nothing to do with what is tested.
+const MONDAY = new Date(2026, 10, 2, 9, 0)
+const TUESDAY = new Date(2026, 10, 3, 9, 0)
+const SUNDAY = new Date(2026, 10, 1, 9, 0)
+const FRIDAY_MIDNIGHT = new Date(2026, 9, 30)
+
+describe('cutoffOf over the last workday', () => {
+  it('reaches back over the weekend to friday midnight on a monday', () => {
+    expect(cutoffOf(MONDAY, 36, true)).toEqual(FRIDAY_MIDNIGHT)
+  })
+
+  it('changes nothing on a tuesday, where the hours already cover monday', () => {
+    expect(cutoffOf(TUESDAY, 36, true)).toEqual(cutoffOf(TUESDAY, 36))
+    expect(cutoffOf(TUESDAY, 36, true)).toEqual(new Date(2026, 10, 1, 21, 0))
+  })
+
+  it('reaches back to friday from a sunday as well', () => {
+    expect(cutoffOf(SUNDAY, 36, true)).toEqual(FRIDAY_MIDNIGHT)
+  })
+
+  it('keeps the wider window when the hours already reach further back', () => {
+    expect(cutoffOf(MONDAY, 96, true)).toEqual(new Date(2026, 9, 29, 9, 0))
+  })
+})
+
+describe('lastWorkdayStart', () => {
+  it('skips saturday and sunday from a monday', () => {
+    expect(lastWorkdayStart(MONDAY)).toEqual(FRIDAY_MIDNIGHT)
+  })
+
+  it('takes plain yesterday in the middle of the week', () => {
+    expect(lastWorkdayStart(new Date(2026, 10, 4, 9, 0))).toEqual(new Date(2026, 10, 3))
+  })
+
+  it('takes friday from a saturday, not the day before that', () => {
+    expect(lastWorkdayStart(new Date(2026, 9, 31, 9, 0))).toEqual(FRIDAY_MIDNIGHT)
+  })
 })
 
 describe('sinceOf', () => {
@@ -51,6 +96,14 @@ describe('sinceOf', () => {
 
   it('stays on the local date instead of slipping a day through UTC', () => {
     expect(sinceOf(new Date(2026, 9, 19, 0, 30), 0)).toBe('2026-10-18')
+  })
+
+  it('asks back past the weekend on a monday, so friday survives the prefilter', () => {
+    expect(sinceOf(MONDAY, 36, true)).toBe('2026-10-29')
+  })
+
+  it('asks no further than usual on a tuesday', () => {
+    expect(sinceOf(TUESDAY, 36, true)).toBe('2026-10-31')
   })
 })
 
@@ -139,6 +192,47 @@ describe('fetchCommits', () => {
       5,
     )
     expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  const monday = { fetch: null as never, now: () => MONDAY }
+  const friday = push({ created_at: '2026-10-30T15:00:00.000Z', project_id: 1 })
+
+  it('drops fridays push on a monday without the workday window', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => [{ id: 1, name: 'ki-backend' }] })
+      .mockResolvedValueOnce({ ok: true, json: async () => [friday] })
+
+    const result = await fetchCommits(
+      config,
+      't',
+      { ...monday, fetch: fetchMock as never },
+      [{ name: 'Julien', gitlabUser: null, self: true }],
+      36,
+      5,
+    )
+    expect(result.Julien).toEqual([])
+  })
+
+  it('keeps fridays push on a monday and asks gitlab far enough back', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => [{ id: 1, name: 'ki-backend' }] })
+      .mockResolvedValueOnce({ ok: true, json: async () => [friday] })
+
+    const result = await fetchCommits(
+      config,
+      't',
+      { ...monday, fetch: fetchMock as never },
+      [{ name: 'Julien', gitlabUser: null, self: true }],
+      36,
+      5,
+      true,
+    )
+
+    expect(String(fetchMock.mock.calls[1]![0])).toContain('after=2026-10-29')
+    expect(result.Julien).toHaveLength(1)
+    expect(result.Julien![0]!.project).toBe('ki-backend')
   })
 })
 

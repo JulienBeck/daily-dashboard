@@ -205,6 +205,7 @@ Merge-Request-Läufe und externe Läufe bleiben außen vor — die gehören nich
 | `jira.laneStatus` | je Spalte eine Liste von **Zielstatus-Namen** für das Verschieben per Drag-and-drop. Leer gelassen nimmt der Proxy den ersten passenden Übergang — siehe „Stories verschieben" |
 | `team[].email` | Dienstliche Adresse, mit der die Person in den angebundenen Systemen gefunden wird — heute das Jira-Profilbild. Weggelassen sucht der Proxy nach `name` und nimmt den Treffer nur, wenn er eindeutig ist. Ein Jira-Benutzername tut es auch, die Suche nimmt beides |
 | `activity.hours` / `activity.perMember` | Rückblick in **Stunden** (Vorgabe 36) und wie viele **Repositories** je Person unter dem Namen stehen — siehe „Was habe ich gestern gemacht" |
+| `activity.sinceLastWorkday` | Vorgabe **true**: der Rückblick reicht immer bis 0:00 des letzten Werktags, am Montag also bis Freitag |
 | `calendar.sources` | je Person ein Eintrag `{ member, env, own }`. `env` nennt die **Umgebungsvariable**, in der die ICS-Adresse steht — die Adresse selbst bleibt in der `.env`, weil sie das Geheimnis ist |
 | `calendar.absenceKeywords` | ganztägige Termine mit einem dieser Wörter im Titel gelten als Abwesenheit und überschreiben `team[].away` |
 | `absences` | handgepflegte Urlaubsliste mit Zeitraum — siehe „Urlaube eintragen" |
@@ -257,9 +258,28 @@ Unter jedem Namen stehen die Repositories, in denen diese Person zuletzt gearbei
 `×n`, wenn mehr als einer dazugehört. Für das Daily reicht das: der Name des Repositories genügt,
 um sich zu erinnern, worum es ging.
 
-Das Fenster ist `activity.hours`, Vorgabe **36 Stunden**. Nicht 24: wer um 9:00 vor dem Board
-steht, will den gestrigen Nachmittag sehen, und der liegt dann schon 18 Stunden zurück. 36 reicht
-auch am Montag nicht bis Freitag — wer das will, setzt 72.
+Das Fenster hat zwei Untergrenzen, es gilt die **frühere** von beiden:
+
+| Grenze | Schlüssel | Was sie leistet |
+|---|---|---|
+| Stundenschnitt | `activity.hours`, Vorgabe **36** | Nicht 24: wer um 9:00 vor dem Board steht, will den gestrigen Nachmittag sehen, und der liegt dann schon 18 Stunden zurück |
+| Letzter Arbeitstag | `activity.sinceLastWorkday`, Vorgabe **an** | zieht den Schnitt auf **0:00 des letzten Werktags** vor, wenn er sonst später läge |
+
+Die zweite Grenze gibt es wegen des Montags: 36 Stunden reichen von Montag 9:00 nur bis Samstag
+21:00, und damit fällt der ganze Freitag heraus — ausgerechnet der Tag, den man bis zum Daily am
+sichersten vergessen hat.
+
+| Tag, 9:00 | nur Stunden | mit `sinceLastWorkday` |
+|---|---|---|
+| Dienstag–Freitag | vorvorgestern 21:00 | **unverändert** — die Stunden reichen ohnehin weiter zurück als 0:00 des Vortags |
+| Montag | Samstag 21:00 | **Freitag 0:00** |
+| Sonntag | Freitag 21:00 | **Freitag 0:00** |
+
+Die Regel greift also nur dort, wo das Stundenfenster zu kurz wird, und ändert den Rest der Woche
+nichts. Wer sie nicht will, setzt den Schlüssel auf `false`.
+
+Feiertage kennt sie nicht. Nach einem Montagsfeiertag zeigt der Dienstag den leeren Montag statt
+des Freitags; das ist bewusst nicht gelöst, weil es einen Feiertagskalender bräuchte.
 
 **Die Falle dabei:** GitLabs `after=` in `/events` ist **tagesgenau und ausschließend**.
 `after=2026-10-22` liefert erst Ereignisse ab dem 23. Wer dort das Datum von „heute minus ein Tag"
@@ -269,7 +289,7 @@ richtig aussieht. Deshalb zwei Stufen:
 | Stufe | Wo | Was |
 |---|---|---|
 | Vorfilter | `sinceOf` | fragt GitLab einen Tag **vor** dem Stundenschnitt, um die ausschließende Grenze zu überspringen |
-| Schnitt | `eventsInWindow` | wirft danach alles weg, was älter als `cutoffOf(now, hours)` ist — auf die Minute |
+| Schnitt | `eventsInWindow` | wirft danach alles weg, was älter als `cutoffOf` ist — auf die Minute |
 
 Die API-Seite darf also großzügig sein; genau ist erst der zweite Schritt.
 

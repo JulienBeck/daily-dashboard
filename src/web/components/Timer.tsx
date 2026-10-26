@@ -53,13 +53,15 @@ export function Timer() {
     <section className="panel flex shrink-0 items-center gap-3 py-2" aria-label="Daily-Timer">
       <IconTimer className="text-base text-muted" />
       <div
-        className="relative grid size-11 place-items-center rounded-full"
+        className={`relative grid size-11 place-items-center rounded-full${alarm ? ' timer-alarm' : ''}`}
         style={{ background: `conic-gradient(var(--accent) ${progress}%, var(--rule) 0)` }}
         role="img"
         aria-label={`${formatClock(left)} verbleibend`}
       >
         <span className="absolute inset-[5px] rounded-full bg-surface" />
-        <span className="num relative text-[12px] font-bold">{formatClock(left)}</span>
+        <span className={`num relative text-[12px] font-bold${alarm ? ' text-critical' : ''}`}>
+          {formatClock(left)}
+        </span>
       </div>
       {alarm ? (
         <div

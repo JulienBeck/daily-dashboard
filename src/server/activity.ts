@@ -14,11 +14,25 @@ export interface PushEvent {
   }
 }
 
-export const cutoffOf = (now: Date, hours: number) =>
-  new Date(now.getTime() - hours * 3_600_000)
+const isWeekend = (date: Date) => date.getDay() === 0 || date.getDay() === 6
 
-export function sinceOf(now: Date, hours: number): string {
-  const cutoff = cutoffOf(now, hours)
+export function lastWorkdayStart(now: Date): Date {
+  const day = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  do {
+    day.setDate(day.getDate() - 1)
+  } while (isWeekend(day))
+  return day
+}
+
+export function cutoffOf(now: Date, hours: number, sinceLastWorkday = false): Date {
+  const cutoff = new Date(now.getTime() - hours * 3_600_000)
+  if (!sinceLastWorkday) return cutoff
+  const workday = lastWorkdayStart(now)
+  return cutoff.getTime() > workday.getTime() ? workday : cutoff
+}
+
+export function sinceOf(now: Date, hours: number, sinceLastWorkday = false): string {
+  const cutoff = cutoffOf(now, hours, sinceLastWorkday)
   const day = new Date(cutoff.getFullYear(), cutoff.getMonth(), cutoff.getDate() - 1)
   const pad = (value: number) => String(value).padStart(2, '0')
   return `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`
@@ -123,10 +137,11 @@ export async function fetchCommits(
   members: readonly { name: string; gitlabUser: string | null; self: boolean }[],
   hours: number,
   limit: number,
+  sinceLastWorkday = false,
 ): Promise<Record<string, CommitRow[]>> {
   const now = deps.now()
-  const cutoff = cutoffOf(now, hours)
-  const since = sinceOf(now, hours)
+  const cutoff = cutoffOf(now, hours, sinceLastWorkday)
+  const since = sinceOf(now, hours, sinceLastWorkday)
   const projects = await rest<{ id: number; name: string }[]>(
     config,
     token,

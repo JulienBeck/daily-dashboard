@@ -123,6 +123,34 @@ describe('Timer', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  it('blinks the dial along with the frame', () => {
+    render(<Timer />)
+
+    press('Start')
+    tick(1000 * 900)
+
+    expect(screen.getByRole('img')).toHaveClass('timer-alarm')
+  })
+
+  it('leaves the dial alone while the timebox still runs', () => {
+    render(<Timer />)
+
+    press('Start')
+    tick(1000 * 899)
+
+    expect(screen.getByRole('img')).not.toHaveClass('timer-alarm')
+  })
+
+  it('takes the dial back to normal once it has blinked', () => {
+    render(<Timer />)
+
+    press('Start')
+    tick(1000 * 1000)
+    act(() => void fireEvent.animationEnd(screen.getByRole('alert')))
+
+    expect(screen.getByRole('img')).not.toHaveClass('timer-alarm')
+  })
+
   it('clears the frame when the timebox is reset', () => {
     render(<Timer />)
 

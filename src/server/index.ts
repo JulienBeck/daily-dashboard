@@ -115,6 +115,7 @@ app.get('/api/commits', async () => {
       config.team,
       config.activity.hours,
       config.activity.perMember,
+      config.activity.sinceLastWorkday,
     ),
   )
 })

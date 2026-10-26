@@ -177,11 +177,23 @@ describe('parseConfig', () => {
   })
 
   it('looks back a day and a half unless told otherwise', () => {
-    expect(parseConfig({}).activity).toEqual({ hours: 36, perMember: 5 })
+    expect(parseConfig({}).activity).toEqual({
+      hours: 36,
+      perMember: 5,
+      sinceLastWorkday: true,
+    })
     expect(parseConfig({ activity: { hours: 72, perMember: 2 } }).activity).toEqual({
       hours: 72,
       perMember: 2,
+      sinceLastWorkday: true,
     })
+  })
+
+  it('bridges the weekend unless it is switched off explicitly', () => {
+    expect(parseConfig({ activity: { sinceLastWorkday: false } }).activity.sinceLastWorkday).toBe(
+      false,
+    )
+    expect(parseConfig({ activity: {} }).activity.sinceLastWorkday).toBe(true)
   })
 
   it('keeps a configured board id as a number', () => {

@@ -19,6 +19,8 @@
   --warning: #fab219;
   --serious: #ec835a;
   --critical: #e35555;
+  /* Channels of --critical, so the alarm below can fade its own alpha. */
+  --critical-rgb: 227 85 85;
   --running: #8b979f;
   --idle: #8b979f;
 
@@ -141,7 +143,7 @@ body::before {
   }
 }
 
-/* Holds the frame still for the same 1.8s, so animationend still fires and the
+/* Holds the frame still for the same 6s, so animationend still fires and the
    element removes itself. Plain "animation: none" would leave it on screen. */
 @keyframes dash-alarm-steady {
   from,
@@ -150,17 +152,57 @@ body::before {
   }
 }
 
+/* Width of the band and how long the alarm blinks. CSS cm is nominal, not the
+   ruler: on a wall screen check it once and tune here, not in four places. */
+:root {
+  --alarm-band: 2cm;
+  --alarm-beat: 0.75s;
+  --alarm-beats: 8;
+}
+
+/* Four gradients instead of a border: a border is one flat line, this is a band
+   that is solid at the edge and gone 2cm in. Corners overlap and read denser,
+   which is wanted - that is where the eye sits. */
 .alarm-frame {
   position: fixed;
   inset: 0;
   z-index: 50;
   pointer-events: none;
-  border: 6px solid var(--critical);
-  animation: dash-alarm 0.6s ease-in-out 3;
+  background:
+    linear-gradient(to right, rgb(var(--critical-rgb) / 0.95), rgb(var(--critical-rgb) / 0) var(--alarm-band)),
+    linear-gradient(to left, rgb(var(--critical-rgb) / 0.95), rgb(var(--critical-rgb) / 0) var(--alarm-band)),
+    linear-gradient(to bottom, rgb(var(--critical-rgb) / 0.95), rgb(var(--critical-rgb) / 0) var(--alarm-band)),
+    linear-gradient(to top, rgb(var(--critical-rgb) / 0.95), rgb(var(--critical-rgb) / 0) var(--alarm-band));
+  animation: dash-alarm var(--alarm-beat) ease-in-out var(--alarm-beats);
+}
+
+@keyframes dash-timer-alarm {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(var(--critical-rgb) / 0);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgb(var(--critical-rgb) / 0.95);
+  }
+}
+
+@keyframes dash-timer-alarm-steady {
+  from,
+  to {
+    box-shadow: 0 0 0 7px rgb(var(--critical-rgb) / 0.95);
+  }
+}
+
+.timer-alarm {
+  animation: dash-timer-alarm var(--alarm-beat) ease-in-out var(--alarm-beats);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .alarm-frame {
     animation-name: dash-alarm-steady;
+  }
+
+  .timer-alarm {
+    animation-name: dash-timer-alarm-steady;
   }
 }

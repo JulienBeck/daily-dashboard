@@ -43,7 +43,8 @@
   },
   "activity": {
     "hours": 36,
-    "perMember": 5
+    "perMember": 5,
+    "sinceLastWorkday": true
   },
   "refreshSeconds": 60,
   "cacheSeconds": {
