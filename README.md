@@ -215,6 +215,13 @@ Merge-Request-Läufe und externe Läufe bleiben außen vor — die gehören nich
 | `jira.storyPointsField` | leer lassen: erst fragt das Board, womit es schätzt (`/board/<id>/configuration`), erst danach wird nach dem Feldnamen gesucht |
 | `theme.reminderLeadMonths` | Vorlauf der Theme-Erinnerung, Vorgabe 1 Monat |
 | `team` | Namen und Abwesenheiten. `gitlabUser: true` heißt **„das bin ich"** → der Proxy liest `/events` des Token-Besitzers. Ein **String** ist ein Benutzername → `/users/<name>/events`. `false` oder weggelassen → für diese Person werden keine Commits geholt |
+
+> **`gitlabUser: true` taugt nur lokal.** Es bindet die Commits an den Besitzer des
+> Tokens. Auf einem Rechner mit dem eigenen PAT ist das die richtige Person; in einem
+> Deployment mit Gruppen- oder Projekt-Token ist es dessen Bot-Benutzer, und der hat
+> keine Pushes. Das Board bleibt dann stumm leer, obwohl Token und Konfiguration
+> gültig sind. **Für jedes Deployment gehört der Benutzername als String dorthin.**
+> Der Proxy schreibt den Fall ins Log: „/events ist leer — gehört der Token wirklich …".
 | `jira.epicsBoardId` | Board-Nummer aus `…/RapidBoard.jspa?rapidView=<Zahl>`. Der Proxy liest den **Filter des Boards** und baut daraus die Abfrage — so gilt derselbe Bereich wie im Board |
 | `jira.epicsStatusCategories` | welche Epics gezeigt werden; Vorgabe `["indeterminate"]` = **In Progress**, also das laufende Theme |
 | `jira.epicsJql` | gesetzt überschreibt es Board und Status komplett. **Die tatsächlich gesendete Abfrage steht im Board** hinter dem Abzeichen `JQL` neben der Überschrift — darüberfahren genügt |
