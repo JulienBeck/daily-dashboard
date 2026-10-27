@@ -130,8 +130,30 @@ richtige Form, nicht ein Balken über Tickets.
 
 Darüber der Sprint-Fortschritt als **ein** horizontaler gestapelter Balken (Punkte erledigt /
 laufend / offen, 2 px Lücke zwischen den Segmenten, direkte Beschriftung) und daneben die
-verbleibenden Sprint-Tage als Hero-Zahl. Kein Burndown: der bräuchte Tagesschnappschüsse, die wir
-nirgends speichern — bewusst außen vor.
+verbleibenden Sprint-Tage als Hero-Zahl.
+
+### Burndown
+
+Der Entwurf hatte ihn ausgeschlossen — er bräuchte Tagesschnappschüsse, die das Board nirgends
+speichert. Das gilt nicht mehr: Jira Server führt die Historie selbst und gibt sie über den
+Greenhopper-Endpunkt heraus, den die eigene Burndown-Ansicht benutzt. Damit braucht das Board
+keinen eigenen Speicher, und die Kurve ist dieselbe, die im Sprint Review an der Wand hängt.
+
+Form: Treppenlinie über der Zeit, weil zwischen zwei Änderungen nichts abbrennt. Zwei Linien —
+Rest im Jahreszeitakzent, durchgezogen, 2,5 px; Ideal in `#8b979f`, gestrichelt, 1,6 px. Die
+Unterscheidung trägt damit Farbe **und** Strichart, dazu Legende und ein direkt beschrifteter
+Endpunkt. Über der Kachel steht der Abstand zur Ideallinie als Zahl mit Vorzeichen, in
+`serious` wenn der Sprint hinterherhängt, sonst in `good`.
+
+Keine Tooltips: das Board hängt an der Wand, es zeigt niemand mit der Maus darauf. Was ein Hover
+sagen würde — aktueller Rest, Umfang, Abstand zum Ideal — steht deshalb als Text in der Kachel.
+
+**Gemessen gegen die `#25323b`-Fläche, nicht geschätzt:** die naheliegende `--step-3` (`#566670`)
+scheidet aus, sie erreicht als dünne Linie nur 2,21:1. `--step-2` (`#8b979f`) erreicht 3:1 und
+trennt sich von drei der vier Akzente mit ΔE ≥ 17. Der Winterakzent `#8ec8e0` liegt bei ΔE 14,1
+und damit knapp unter der Schwelle von 15 — hier tragen Strichart, Legende und Beschriftung die
+Unterscheidung allein. Wer das sauber haben will, muss die Chroma des Winterakzents anheben, und
+das verschiebt das ganze Wintertheme.
 
 ## Jahreszeiten-Theme
 
@@ -215,20 +237,30 @@ Countdown, per Tag wegklickbar (localStorage). Sie überlagert nichts.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│ ● Herbst          Mo 19.10.          [ Noch 13 Tage bis Winter ]    │
+│ ● Herbst   Mo 19.10.   Epics…       [ Noch 13 Tage bis Winter ]     │
 ├─────────────────────────────────────────────────────────────────────┤
-│ 14✓ 2! 1✕   ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ●        (akzentfrei)   │
+│ ⏱ ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  12:30   [ Pause ]     │
 ├──────────────┬────────────────────────────────┬────────────────────┤
 │ Sprint       │  To Do    In Progress    Done  │  Merge Requests    │
 │  6 Tage      │  ┌────┐   ┌────┐       ┌────┐  │   !3  12 Tage alt  │
 │  ▓▓▓▓░░░░    │  │    │   │    │       │    │  │   ...              │
-│              │  └────┘   └────┘       └────┘  │                    │
-│ Heute weg    │                                │  09:14  ⏱ 12:30    │
+├──────────────┤  └────┘   └────┘       └────┘  │                    │
+│ Burndown  −3 │                                │                    │
+│ ╲▁ ╲▁▁       │                                │                    │
+├──────────────┤                                │                    │
+│ Team         │                                │                    │
 └──────────────┴────────────────────────────────┴────────────────────┘
+│ 14✓ 2! 1✕   ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ●        (akzentfrei)   │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 12-Spalten-Raster, 3 / 6 / 3. Schrift durchgehend `system-ui`, Zahlen in Tabellen
 `tabular-nums`.
+
+Der Daily-Timer sitzt als **zweiter Streifen von oben** über der ganzen Breite: ein Balken, der von
+links nach rechts vollläuft, wie der Sitzungsbalken in Teams. Vorher war er eine Kreisuhr unten
+rechts neben der Ampel — die ist ersatzlos weg. Oben ist der richtige Platz: die Timebox gilt dem
+ganzen Daily, nicht einer Kachel, und ganz unten las ihn im Stehen niemand mehr.
 
 ## Jahreszeiten-Symbole statt Wörtern
 

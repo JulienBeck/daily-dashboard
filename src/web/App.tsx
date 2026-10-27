@@ -10,6 +10,7 @@ import {
 } from '../shared/season.js'
 import {
   getBoard,
+  getBurndown,
   getCalendar,
   getCommits,
   getEpics,
@@ -20,6 +21,7 @@ import {
 } from './api.js'
 import { usePolled } from './usePolled.js'
 import { Ampel } from './components/Ampel.js'
+import { Burndown } from './components/Burndown.js'
 import { MergeRequests } from './components/MergeRequests.js'
 import { People } from './components/People.js'
 import { ReminderBand } from './components/ReminderBand.js'
@@ -33,7 +35,7 @@ const dismissKey = (iso: string) => `theme-reminder-dismissed-${iso}`
 
 function Problem({ what, message }: { what: string; message: string }) {
   return (
-    <section className="panel flex items-center gap-2.5 text-xs text-serious">
+    <section className="panel flex shrink-0 items-center gap-2.5 text-xs text-serious">
       <IconStale className="text-base shrink-0" />
       <span>
         {what}: {message}
@@ -72,6 +74,7 @@ export function App() {
   const commits = usePolled(useCallback(() => getCommits(), []), refresh * 5)
   const calendar = usePolled(useCallback(() => getCalendar(), []), refresh * 5)
   const epics = usePolled(useCallback(() => getEpics(), []), refresh * 5)
+  const burndown = usePolled(useCallback(() => getBurndown(), []), refresh * 5)
 
   const season = forced ?? seasonFor(clock)
   const start = nextSeasonStart(clock)
@@ -121,12 +124,19 @@ export function App() {
         <ReminderBand next={upcoming} daysLeft={daysLeft} onDismiss={onDismiss} />
       ) : null}
 
+      <Timer />
+
       <main
         className="grid min-h-0 flex-1 gap-3"
         style={{ gridTemplateColumns: mrsCollapsed ? '4fr 8fr auto' : '3fr 6fr 3fr' }}
       >
-        <div className="grid min-h-0 grid-rows-[auto_1fr] gap-3">
+        <div className="grid min-h-0 grid-rows-[auto_auto_1fr] gap-3">
           {sprint.value ? <SprintTile sprint={sprint.value.data.sprint} /> : null}
+          {burndown.error ? (
+            <Problem what="Burndown" message={burndown.error} />
+          ) : burndown.value ? (
+            <Burndown payload={burndown.value.data} />
+          ) : null}
           <People
             team={board.value?.team ?? []}
             commits={commits.value?.data ?? {}}
@@ -157,16 +167,11 @@ export function App() {
         )}
       </main>
 
-      <div className="flex shrink-0 items-stretch gap-3">
-        {pipelines.error ? (
-          <div className="flex-1">
-            <Problem what="Pipelines" message={pipelines.error} />
-          </div>
-        ) : (
-          <Ampel rows={pipelines.value?.data ?? []} stale={pipelines.value?.stale ?? false} />
-        )}
-        <Timer />
-      </div>
+      {pipelines.error ? (
+        <Problem what="Pipelines" message={pipelines.error} />
+      ) : (
+        <Ampel rows={pipelines.value?.data ?? []} stale={pipelines.value?.stale ?? false} />
+      )}
     </div>
   )
 }

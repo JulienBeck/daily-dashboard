@@ -1,6 +1,7 @@
 import Fastify from 'fastify'
 import { dayKey, resolveAbsence } from './absence.js'
 import { fetchCommits } from './activity.js'
+import { fetchBurndown } from './burndown.js'
 import { StaleCache } from './cache.js'
 import { fetchCalendar } from './calendar.js'
 import { forBoard, loadConfig } from './config.js'
@@ -138,6 +139,14 @@ app.get('/api/sprint', async () => {
   )
 })
 
+app.get('/api/burndown', async () => {
+  guard(Boolean(jiraCredentials.token), 'JIRA_TOKEN ist nicht gesetzt')
+  guard(config.jira.boardId != null, 'Burndown braucht jira.boardId — freies JQL hat keine Historie')
+  return cache.get('burndown', config.cacheSeconds.jira, () =>
+    fetchBurndown(config.jira, jiraCredentials, deps),
+  )
+})
+
 app.post<{ Params: { key: string }; Body: { lane?: string } }>(
   '/api/issues/:key/lane',
   async (request) => {
@@ -154,6 +163,7 @@ app.post<{ Params: { key: string }; Body: { lane?: string } }>(
     )
     // The board polls the cached sprint; without this the card would snap back.
     cache.invalidate('sprint')
+    cache.invalidate('burndown')
     return moved
   },
 )

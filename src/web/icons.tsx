@@ -141,6 +141,15 @@ export const IconBoard = (props: IconProps) => (
   </Svg>
 )
 
+export const IconBurndown = (props: IconProps) => (
+  <Svg {...props}>
+    <g {...stroke}>
+      <path d="M3.4 3.6v16.8h17.2" />
+      <path d="M5.8 6.4h3.4v3.6h3.6v4.2h3.6v4.2h3.6" />
+    </g>
+  </Svg>
+)
+
 export const IconMerge = (props: IconProps) => (
   <Svg {...props}>
     <g {...stroke}>

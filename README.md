@@ -6,12 +6,29 @@ dunkel, ohne Scrollen, mit einem Jahreszeiten-Theme, das sich alle drei Monate �
 Entwurf und Farbbegründung: [`design/ENTWURF.md`](design/ENTWURF.md).
 Statisches Mockup ohne Build: [`design/mockup.html`](design/mockup.html).
 
+## Burndown
+
+`/api/burndown` liest `/rest/greenhopper/1.0/rapid/charts/scopechangeburndownchart` — denselben
+Endpunkt, den Jiras eigenes Burndown benutzt. Er ist **undokumentiert** und gibt es nur auf Jira
+Server/DC; die Rapid-View-ID ist dort die Board-ID aus `jira.boardId`. Ohne `boardId` (also bei
+freiem JQL) gibt es keine Historie und der Endpunkt antwortet mit einem Fehler.
+
+Der Proxy rechnet die Änderungsliste in eine Restkurve um (`src/server/burndown.ts`): jeder Eintrag
+schiebt ein Issue in den Sprint oder heraus, ändert seine Schätzung oder kippt seine Spalte — die
+Summe über alles, was noch im Sprint und nicht fertig ist, ist ein Punkt der Linie. Die Linie ist
+eine **Treppe**, keine Schräge: zwischen zwei Änderungen brennt nichts ab, und eine Interpolation
+würde Fortschritt an Tagen erfinden, an denen keiner war.
+
+Die Ideallinie ist eine Gerade vom Umfang bei Sprintbeginn auf null bei Sprintende. Jiras eigene
+Guideline knickt zusätzlich bei Scope-Änderungen und freien Tagen — für das Board ist die Gerade
+die ehrlichere Vereinfachung, die Scope-Änderung steht als Zahl daneben.
+
 ## Aufbau
 
 ```
 Browser (SPA, kein Token)
    │  /api/board /api/pipelines /api/mrs /api/sprint /api/epics
-   │  /api/commits /api/calendar /api/avatar
+   │  /api/commits /api/calendar /api/avatar /api/burndown
    │  POST /api/issues/<key>/lane
    ▼
 Fastify-Proxy (GITLAB_TOKEN, JIRA_TOKEN)

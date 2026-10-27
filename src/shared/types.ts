@@ -65,6 +65,22 @@ export interface SprintInfo {
   points: { done: number; doing: number; open: number }
 }
 
+export interface BurndownPoint {
+  at: string
+  remaining: number
+}
+
+export interface BurndownPayload {
+  sprintName: string
+  start: string
+  end: string
+  now: string
+  points: BurndownPoint[]
+  startScope: number
+  scope: number
+  unit: 'points' | 'issues'
+}
+
 export interface UpcomingAbsence {
   label: string
   from: string

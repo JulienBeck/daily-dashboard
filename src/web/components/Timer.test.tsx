@@ -123,32 +123,58 @@ describe('Timer', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('blinks the dial along with the frame', () => {
+  it('fills the bar from left to right as the timebox burns', () => {
+    render(<Timer />)
+    const bar = () => screen.getByRole('progressbar').firstElementChild as HTMLElement
+
+    expect(bar().style.width).toBe('0%')
+
+    press('Start')
+    tick(1000 * 450)
+    expect(bar().style.width).toBe('50%')
+
+    tick(1000 * 450)
+    expect(bar().style.width).toBe('100%')
+  })
+
+  it('reports elapsed and remaining time to assistive tech', () => {
+    render(<Timer />)
+
+    press('Start')
+    tick(1000 * 60)
+
+    const bar = screen.getByRole('progressbar')
+    expect(bar).toHaveAttribute('aria-valuenow', '60')
+    expect(bar).toHaveAttribute('aria-valuemax', '900')
+    expect(bar).toHaveAttribute('aria-valuetext', '14:00 verbleibend')
+  })
+
+  it('blinks the bar along with the frame', () => {
     render(<Timer />)
 
     press('Start')
     tick(1000 * 900)
 
-    expect(screen.getByRole('img')).toHaveClass('timer-alarm')
+    expect(screen.getByRole('progressbar')).toHaveClass('timer-alarm')
   })
 
-  it('leaves the dial alone while the timebox still runs', () => {
+  it('leaves the bar alone while the timebox still runs', () => {
     render(<Timer />)
 
     press('Start')
     tick(1000 * 899)
 
-    expect(screen.getByRole('img')).not.toHaveClass('timer-alarm')
+    expect(screen.getByRole('progressbar')).not.toHaveClass('timer-alarm')
   })
 
-  it('takes the dial back to normal once it has blinked', () => {
+  it('takes the bar back to normal once it has blinked', () => {
     render(<Timer />)
 
     press('Start')
     tick(1000 * 1000)
     act(() => void fireEvent.animationEnd(screen.getByRole('alert')))
 
-    expect(screen.getByRole('img')).not.toHaveClass('timer-alarm')
+    expect(screen.getByRole('progressbar')).not.toHaveClass('timer-alarm')
   })
 
   it('clears the frame when the timebox is reset', () => {

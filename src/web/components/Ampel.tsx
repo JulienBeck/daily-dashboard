@@ -47,7 +47,7 @@ export function Ampel({ rows, stale }: { rows: PipelineRow[]; stale: boolean }) 
 
   return (
     <section
-      className="panel flex flex-1 items-center gap-5 py-2"
+      className="panel flex shrink-0 items-center gap-5 py-2"
       aria-label="Pipeline-Ampel"
       data-stale={stale ? 'true' : undefined}
     >

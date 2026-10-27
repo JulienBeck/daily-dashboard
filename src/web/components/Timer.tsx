@@ -51,18 +51,26 @@ export function Timer() {
 
   return (
     <section className="panel flex shrink-0 items-center gap-3 py-2" aria-label="Daily-Timer">
-      <IconTimer className="text-base text-muted" />
+      <IconTimer className="text-base shrink-0 text-muted" />
+
       <div
-        className={`relative grid size-11 place-items-center rounded-full${alarm ? ' timer-alarm' : ''}`}
-        style={{ background: `conic-gradient(var(--accent) ${progress}%, var(--rule) 0)` }}
-        role="img"
-        aria-label={`${formatClock(left)} verbleibend`}
+        className={`h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-rule${alarm ? ' timer-alarm' : ''}`}
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={TOTAL}
+        aria-valuenow={TOTAL - left}
+        aria-valuetext={`${formatClock(left)} verbleibend`}
       >
-        <span className="absolute inset-[5px] rounded-full bg-surface" />
-        <span className={`num relative text-[12px] font-bold${alarm ? ' text-critical' : ''}`}>
-          {formatClock(left)}
-        </span>
+        <div
+          className="h-full rounded-full bg-accent transition-[width] duration-1000 ease-linear"
+          style={{ width: `${progress}%` }}
+        />
       </div>
+
+      <span className={`num shrink-0 text-sm font-bold${alarm ? ' text-critical' : ''}`}>
+        {formatClock(left)}
+      </span>
+
       {alarm ? (
         <div
           className="alarm-frame"
@@ -71,11 +79,12 @@ export function Timer() {
           onAnimationEnd={() => setAlarm(false)}
         />
       ) : null}
+
       <button
         type="button"
         onClick={() => (left === 0 ? reset() : toggle())}
         title="Leertaste startet und pausiert"
-        className="rounded-md border border-white/10 bg-card px-3 py-1 text-xs text-ink-2 hover:border-accent hover:text-ink"
+        className="shrink-0 rounded-md border border-white/10 bg-card px-3 py-1 text-xs text-ink-2 hover:border-accent hover:text-ink"
       >
         {label}
       </button>

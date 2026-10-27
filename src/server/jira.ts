@@ -136,7 +136,7 @@ export function summarise(
   }
 }
 
-async function call<T>(
+export async function call<T>(
   config: JiraConfig,
   credentials: JiraCredentials,
   flavor: 'server' | 'cloud',
@@ -434,6 +434,31 @@ export async function detectFlavor(
   return info.deploymentType === 'Cloud' ? 'cloud' : 'server'
 }
 
+export interface ActiveSprint {
+  id: number
+  name: string
+  startDate?: string
+  endDate?: string
+}
+
+export async function fetchActiveSprint(
+  config: JiraConfig,
+  credentials: JiraCredentials,
+  flavor: 'server' | 'cloud',
+  deps: JiraDeps,
+): Promise<ActiveSprint> {
+  const sprints = await call<{ values: ActiveSprint[] }>(
+    config,
+    credentials,
+    flavor,
+    deps,
+    `/rest/agile/1.0/board/${config.boardId}/sprint?state=active`,
+  )
+  const active = sprints.values?.[0]
+  if (!active) throw new Error('Jira: kein aktiver Sprint auf diesem Board')
+  return active
+}
+
 export async function fetchSprint(
   config: JiraConfig,
   credentials: JiraCredentials,
@@ -472,17 +497,7 @@ export async function fetchSprint(
   let issues: JiraIssue[] = []
 
   if (config.boardId != null) {
-    const sprints = await call<{
-      values: { id: number; name: string; startDate?: string; endDate?: string }[]
-    }>(
-      config,
-      credentials,
-      flavor,
-      deps,
-      `/rest/agile/1.0/board/${config.boardId}/sprint?state=active`,
-    )
-    const active = sprints.values[0]
-    if (!active) throw new Error('Jira: kein aktiver Sprint auf diesem Board')
+    const active = await fetchActiveSprint(config, credentials, flavor, deps)
     sprintName = active.name
     startDate = active.startDate ?? null
     endDate = active.endDate ?? null
