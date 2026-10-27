@@ -6,12 +6,14 @@ import type {
   TeamMember,
   UpcomingAbsence,
 } from '../../shared/types.js'
-import { IconChevron, IconMerge, IconPeople, IconTimer } from '../icons.js'
+import { IconChevron, IconMerge, IconPeople, IconStale, IconTimer } from '../icons.js'
 
 interface Props {
   team: TeamMember[]
   commits: Record<string, CommitRow[]>
   calendar: CalendarByMember
+  commitsError?: string | null
+  calendarError?: string | null
 }
 
 const time = new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' })
@@ -67,7 +69,7 @@ function Line({
   )
 }
 
-export function People({ team, commits, calendar }: Props) {
+export function People({ team, commits, calendar, commitsError, calendarError }: Props) {
   const present = team.filter((member) => awayOf(member, calendar) === null).length
   const [open, setOpen] = useState<Record<string, boolean>>(() => {
     try {
@@ -84,14 +86,31 @@ export function People({ team, commits, calendar }: Props) {
       return next
     })
 
+  const broken = [
+    commitsError ? `Commits: ${commitsError}` : null,
+    calendarError ? `Kalender: ${calendarError}` : null,
+  ].filter((message): message is string => message !== null)
+
   return (
     <section className="panel grid min-h-0 grid-rows-[auto_1fr]">
-      <div className="panel-head">
-        <IconPeople className="text-sm" />
-        <span className="flex-1">Team</span>
-        <span className="num normal-case">
-          {present} / {team.length}
-        </span>
+      <div>
+        <div className={broken.length > 0 ? 'panel-head mb-2' : 'panel-head'}>
+          <IconPeople className="text-sm" />
+          <span className="flex-1">Team</span>
+          <span className="num normal-case">
+            {present} / {team.length}
+          </span>
+        </div>
+
+        {/* Without this the panel just stays empty and looks like a quiet day. */}
+        {broken.map((message) => (
+          <p key={message} className="flex items-center gap-1.5 pb-2 text-[11px] text-serious">
+            <IconStale className="shrink-0 text-xs" />
+            <span className="truncate" title={message}>
+              {message}
+            </span>
+          </p>
+        ))}
       </div>
 
       <ul className="grid content-start gap-3 overflow-hidden text-[13px]" role="list">

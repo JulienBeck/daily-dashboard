@@ -141,6 +141,8 @@ export function App() {
             team={board.value?.team ?? []}
             commits={commits.value?.data ?? {}}
             calendar={calendar.value?.data ?? {}}
+            commitsError={commits.error}
+            calendarError={calendar.error}
           />
         </div>
 

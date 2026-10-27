@@ -55,7 +55,8 @@ const render0 = (
   team: TeamMember[],
   commits: Record<string, CommitRow[]> = {},
   calendar: CalendarByMember = {},
-) => render(<People team={team} commits={commits} calendar={calendar} />)
+  errors: { commitsError?: string | null; calendarError?: string | null } = {},
+) => render(<People team={team} commits={commits} calendar={calendar} {...errors} />)
 
 const openAll = () => {
   for (const button of screen.getAllByRole('button')) {
@@ -296,5 +297,28 @@ describe('People', () => {
   it('stays bare for a member with nothing coming', () => {
     render0([member()])
     expect(screen.queryByText(/ ab /)).not.toBeInTheDocument()
+  })
+
+  it('says why the commits are missing instead of looking like a quiet day', () => {
+    render0([member()], {}, {}, { commitsError: 'GitLab 403 Forbidden' })
+    expect(screen.getByText('Commits: GitLab 403 Forbidden')).toBeInTheDocument()
+  })
+
+  it('names the calendar separately, so one broken source is not blamed on both', () => {
+    render0([member()], {}, {}, { calendarError: 'ICS 404' })
+    expect(screen.getByText('Kalender: ICS 404')).toBeInTheDocument()
+    expect(screen.queryByText(/^Commits:/)).not.toBeInTheDocument()
+  })
+
+  it('lists both sources when both are down', () => {
+    render0([member()], {}, {}, { commitsError: 'GitLab 403', calendarError: 'ICS 404' })
+    expect(screen.getByText('Commits: GitLab 403')).toBeInTheDocument()
+    expect(screen.getByText('Kalender: ICS 404')).toBeInTheDocument()
+  })
+
+  it('stays quiet while both sources answer', () => {
+    render0([member()], { 'J. Beck': [commit()] })
+    expect(screen.queryByText(/^Commits:/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Kalender:/)).not.toBeInTheDocument()
   })
 })
