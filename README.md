@@ -275,6 +275,15 @@ Unter jedem Namen stehen die Repositories, in denen diese Person zuletzt gearbei
 `×n`, wenn mehr als einer dazugehört. Für das Daily reicht das: der Name des Repositories genügt,
 um sich zu erinnern, worum es ging.
 
+Der Baum steht **offen**, ein Klick auf den Namen klappt ihn zu und wieder auf. Die Entscheidung
+merkt sich `localStorage` unter `people-open`, und zwar nur als Abweichung: ein Name, der dort
+nicht steht, ist offen. Zugeklappt als Vorgabe war ein Fehlgriff — der einzige Hinweis darauf,
+dass etwas da ist, war ein Zähler in 10 px, und damit sah ein voller Tag aus wie ein leerer.
+
+Läuft die Liste über die Kachelhöhe hinaus, scrollt sie. Das Board soll sonst ohne Scrollen
+auskommen; hier ist eine Leiste das kleinere Übel, denn vorher wurde der Überhang wortlos
+abgeschnitten.
+
 Das Fenster hat zwei Untergrenzen, es gilt die **frühere** von beiden:
 
 | Grenze | Schlüssel | Was sie leistet |
@@ -294,6 +303,10 @@ sichersten vergessen hat.
 
 Die Regel greift also nur dort, wo das Stundenfenster zu kurz wird, und ändert den Rest der Woche
 nichts. Wer sie nicht will, setzt den Schlüssel auf `false`.
+
+Antwortet `/api/commits` oder `/api/calendar` gar nicht, steht der Grund als Zeile in der Kachel.
+Ohne das sieht eine kaputte Quelle genauso aus wie ein ruhiger Tag, und man sucht den Fehler an
+der falschen Stelle. Welche Quelle für wen leer bleibt, steht zusätzlich im Proxy-Log.
 
 Feiertage kennt sie nicht. Nach einem Montagsfeiertag zeigt der Dienstag den leeren Montag statt
 des Freitags; das ist bewusst nicht gelöst, weil es einen Feiertagskalender bräuchte.

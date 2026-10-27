@@ -58,12 +58,6 @@ const render0 = (
   errors: { commitsError?: string | null; calendarError?: string | null } = {},
 ) => render(<People team={team} commits={commits} calendar={calendar} {...errors} />)
 
-const openAll = () => {
-  for (const button of screen.getAllByRole('button')) {
-    if (button.getAttribute('aria-expanded') === 'false') fireEvent.click(button)
-  }
-}
-
 beforeEach(() => localStorage.clear())
 
 describe('awayOf', () => {
@@ -162,13 +156,11 @@ describe('People', () => {
 
   it('names the repository next to the commit, not only in the tooltip', () => {
     render0([member()], { 'J. Beck': [commit({ project: 'ki-backend' })] })
-    openAll()
     expect(screen.getByText('ki-backend')).toBeInTheDocument()
   })
 
   it('lists the commits under the matching developer', () => {
     render0([member()], { 'J. Beck': [commit()] })
-    openAll()
     expect(screen.getByText('Ampel laut machen')).toBeInTheDocument()
   })
 
@@ -179,7 +171,6 @@ describe('People', () => {
 
   it('marks a push that carried several commits', () => {
     render0([member()], { 'J. Beck': [commit({ count: 7 })] })
-    openAll()
     expect(screen.getByText('×7')).toBeInTheDocument()
   })
 
@@ -190,7 +181,6 @@ describe('People', () => {
 
   it('puts the appointments of the same person underneath', () => {
     render0([member()], {}, { 'J. Beck': day({ today: [entry({ summary: 'Refinement' })] }) })
-    openAll()
     expect(screen.getByText('Refinement')).toBeInTheDocument()
   })
 
@@ -205,7 +195,6 @@ describe('People', () => {
         }),
       },
     )
-    openAll()
     const detail = screen.getAllByRole('list')[1]!
     const texts = within(detail)
       .getAllByRole('listitem')
@@ -217,31 +206,29 @@ describe('People', () => {
 
   it('writes ganztägig instead of a time for an all-day entry', () => {
     render0([member()], {}, { 'J. Beck': day({ today: [entry({ allDay: true })] }) })
-    openAll()
     expect(screen.getByText('ganztägig')).toBeInTheDocument()
   })
 
   it('marks an entry from yesterday, so the two days never blur', () => {
     render0([member()], {}, { 'J. Beck': day({ yesterday: [entry({ summary: 'Retro' })] }) })
-    openAll()
     expect(screen.getByText(/^gestern /)).toBeInTheDocument()
   })
 
-  it('starts collapsed, so a full team stays readable', () => {
+  it('starts open, so the commit tree is there without a click', () => {
     render0([member()], { 'J. Beck': [commit()] })
-    expect(screen.queryByText('Ampel laut machen')).not.toBeInTheDocument()
-    expect(screen.getByRole('button')).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByText('Ampel laut machen')).toBeInTheDocument()
+    expect(screen.getByRole('button')).toHaveAttribute('aria-expanded', 'true')
   })
 
-  it('opens and closes again on click', () => {
+  it('closes and opens again on click', () => {
     render0([member()], { 'J. Beck': [commit()] })
     const button = screen.getByRole('button')
 
     fireEvent.click(button)
-    expect(screen.getByText('Ampel laut machen')).toBeInTheDocument()
+    expect(screen.queryByText('Ampel laut machen')).not.toBeInTheDocument()
 
     fireEvent.click(button)
-    expect(screen.queryByText('Ampel laut machen')).not.toBeInTheDocument()
+    expect(screen.getByText('Ampel laut machen')).toBeInTheDocument()
   })
 
   it('shows how much is hidden behind a collapsed name', () => {
@@ -258,11 +245,23 @@ describe('People', () => {
     expect(screen.getByRole('button')).toBeDisabled()
   })
 
-  it('remembers which names were open', () => {
+  it('remembers which names were folded away by hand', () => {
     const { unmount } = render0([member()], { 'J. Beck': [commit()] })
     fireEvent.click(screen.getByRole('button'))
     unmount()
 
+    render0([member()], { 'J. Beck': [commit()] })
+    expect(screen.queryByText('Ampel laut machen')).not.toBeInTheDocument()
+  })
+
+  it('opens a name the stored state has never heard of', () => {
+    localStorage.setItem('people-open', JSON.stringify({ Timo: false }))
+    render0([member()], { 'J. Beck': [commit()] })
+    expect(screen.getByText('Ampel laut machen')).toBeInTheDocument()
+  })
+
+  it('keeps a stored open state open', () => {
+    localStorage.setItem('people-open', JSON.stringify({ 'J. Beck': true }))
     render0([member()], { 'J. Beck': [commit()] })
     expect(screen.getByText('Ampel laut machen')).toBeInTheDocument()
   })

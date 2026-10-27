@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import type {
   CalendarByMember,
   CalendarEntry,
@@ -49,7 +49,7 @@ function Line({
   dim,
   title,
 }: {
-  icon: React.ReactNode
+  icon: ReactNode
   lead: string
   text: string
   trail?: string
@@ -81,7 +81,7 @@ export function People({ team, commits, calendar, commitsError, calendarError }:
 
   const toggle = (name: string) =>
     setOpen((previous) => {
-      const next = { ...previous, [name]: !previous[name] }
+      const next = { ...previous, [name]: !(previous[name] ?? true) }
       localStorage.setItem('people-open', JSON.stringify(next))
       return next
     })
@@ -113,7 +113,7 @@ export function People({ team, commits, calendar, commitsError, calendarError }:
         ))}
       </div>
 
-      <ul className="grid content-start gap-3 overflow-hidden text-[13px]" role="list">
+      <ul className="grid content-start gap-3 overflow-y-auto text-[13px]" role="list">
         {team.map((member) => {
           const away = awayOf(member, calendar)
           const soon = away ? null : nextAwayOf(member.nextAway)
@@ -125,7 +125,9 @@ export function People({ team, commits, calendar, commitsError, calendarError }:
           ]
 
           const count = pushes.length + agenda.length
-          const expanded = Boolean(open[member.name])
+          // Open unless this member was folded away by hand: the commit tree is
+          // what the panel is for, and a 10px badge is not a visible fallback.
+          const expanded = open[member.name] ?? true
 
           return (
             <li key={member.name}>
