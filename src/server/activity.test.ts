@@ -389,6 +389,26 @@ describe('diagnoseEmptyFeed', () => {
     expect(message).not.toContain('kennt keinen')
   })
 
+  it('points at gitlabUser true when the token belongs to that very user', async () => {
+    const message = await diagnoseEmptyFeed(
+      { gitlabUser: 'j.beck', self: false },
+      owner({ id: 1, username: 'j.beck' }),
+      lookup([{ id: 1, username: 'j.beck' }]),
+    )
+    expect(message).toContain('gitlabUser: true')
+  })
+
+  it('blames the foreign token when it belongs to somebody else', async () => {
+    const message = await diagnoseEmptyFeed(
+      { gitlabUser: 'j.beck', self: false },
+      owner(bot),
+      lookup([{ id: 1, username: 'j.beck' }]),
+    )
+    expect(message).toContain('group_770_bot')
+    expect(message).toContain('privaten Projekten')
+    expect(message).not.toContain('gitlabUser: true')
+  })
+
   it('claims nothing when the lookup itself failed', async () => {
     const message = await diagnoseEmptyFeed(
       { gitlabUser: 'timo', self: false },

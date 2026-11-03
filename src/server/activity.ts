@@ -156,9 +156,17 @@ export async function diagnoseEmptyFeed(
   const handle = member.gitlabUser ?? ''
   const found = await lookup(handle)
   if (found === null) return `„${handle}" ließ sich bei GitLab nicht nachschlagen`
-  if (found.length > 0) return `„${handle}" gibt es, liefert aber keine sichtbaren Pushes`
 
   const user = await owner()
+  if (found.length > 0) {
+    if (user?.username === handle) {
+      return `„${handle}" gibt es und der Token gehört genau diesem Benutzer — mit gitlabUser: true liest das Board dessen eigenes Protokoll, ohne Sichtbarkeitsfilter`
+    }
+    return user
+      ? `„${handle}" gibt es, aber der Token von „${user.username}" sieht keine Pushes davon — fremde Beiträge in privaten Projekten bleiben verborgen`
+      : `„${handle}" gibt es, liefert aber keine sichtbaren Pushes`
+  }
+
   return user
     ? `GitLab kennt keinen Benutzer „${handle}" — der Token gehört „${user.username}"`
     : `GitLab kennt keinen Benutzer „${handle}"`

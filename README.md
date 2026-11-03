@@ -216,12 +216,14 @@ Merge-Request-Läufe und externe Läufe bleiben außen vor — die gehören nich
 | `theme.reminderLeadMonths` | Vorlauf der Theme-Erinnerung, Vorgabe 1 Monat |
 | `team` | Namen und Abwesenheiten. `gitlabUser: true` heißt **„das bin ich"** → der Proxy liest `/events` des Token-Besitzers. Ein **String** ist ein Benutzername → `/users/<name>/events`. `false` oder weggelassen → für diese Person werden keine Commits geholt |
 
-> **`gitlabUser: true` taugt nur lokal.** Es bindet die Commits an den Besitzer des
-> Tokens. Auf einem Rechner mit dem eigenen PAT ist das die richtige Person; in einem
-> Deployment mit Gruppen- oder Projekt-Token ist es dessen Bot-Benutzer, und der hat
-> keine Pushes. Das Board bleibt dann stumm leer, obwohl Token und Konfiguration
-> gültig sind. **Für jedes Deployment gehört der Benutzername als String dorthin.**
-> Der Proxy schreibt den Fall ins Log: „/events ist leer — gehört der Token wirklich …".
+> **`gitlabUser: true` steht und fällt mit dem Token, nicht mit der Umgebung.** Es bindet
+> die Commits an den Besitzer des Tokens. Ist das ein Gruppen- oder Projekt-Token, ist der
+> Besitzer dessen Bot-Benutzer, und der hat keine Pushes — das Board bleibt stumm leer,
+> obwohl Token und Konfiguration gültig sind. Ist es dagegen der **eigene PAT**, ist `true`
+> auch im Deployment die richtige und oft die **einzige** Wahl: der Umweg über den
+> Benutzernamen zeigt nur, was der fragende Token sehen darf, und das schließt fremde
+> Beiträge in privaten Projekten aus. Wem der Token gehört, sagt der Proxy selbst — siehe
+> „Wenn unter einem Namen nichts steht".
 | `jira.epicsBoardId` | Board-Nummer aus `…/RapidBoard.jspa?rapidView=<Zahl>`. Der Proxy liest den **Filter des Boards** und baut daraus die Abfrage — so gilt derselbe Bereich wie im Board |
 | `jira.epicsStatusCategories` | welche Epics gezeigt werden; Vorgabe `["indeterminate"]` = **In Progress**, also das laufende Theme |
 | `jira.epicsJql` | gesetzt überschreibt es Board und Status komplett. **Die tatsächlich gesendete Abfrage steht im Board** hinter dem Abzeichen `JQL` neben der Überschrift — darüberfahren genügt |
@@ -340,7 +342,8 @@ keine einzige zusätzliche Anfrage:
 | Fall | Woran der Proxy ihn erkennt | Was im Board steht |
 |---|---|---|
 | Name falsch geschrieben | `/users?username=<name>` findet niemanden | `GitLab kennt keinen Benutzer „…" — der Token gehört „…"` |
-| Name richtig, nichts gepusht | derselbe Aufruf findet den Benutzer | `„…" gibt es, liefert aber keine sichtbaren Pushes` |
+| Name richtig, Token gehört derselben Person | `/user` nennt genau diesen Benutzer | `… der Token gehört genau diesem Benutzer — mit gitlabUser: true …` |
+| Name richtig, fremder Token | `/user` nennt jemand anderen | `… aber der Token von „…" sieht keine Pushes davon — fremde Beiträge in privaten Projekten bleiben verborgen` |
 | `gitlabUser: true` im Deployment | `/user` nennt den Token-Besitzer | `der Token gehört „…" … bei einem Gruppen-Token ist das dessen Bot-Benutzer` |
 
 **Der Name des Token-Besitzers ist dabei die Antwort auf die häufigste Frage überhaupt**: wie der
@@ -349,6 +352,13 @@ Zeile unter dem Namen im Board.
 
 Wer `gitlabUser` versehentlich auf eine **Mailadresse** setzt, bekommt genau diese Zeile: GitLabs
 `/users/:id` nimmt ID oder Benutzername, und ein `@` kommt in keinem Benutzernamen vor.
+
+**Der häufigste Fall ist der dritte**, und er hat nichts mit der Schreibweise zu tun:
+`/users/<name>/events` zeigt nur, was der **fragende** Token sehen darf. Beiträge in privaten
+Projekten sind das für einen fremden Token nicht — der Benutzer existiert, die Liste bleibt
+trotzdem leer. `/events` des Token-Besitzers kennt diese Einschränkung nicht. Gehört der Token
+also der Person selbst, ist `gitlabUser: true` nicht nur erlaubt, sondern der einzige Weg, der
+ohne Zutun der GitLab-Administration funktioniert.
 
 Eine Person ohne `gitlabUser` bleibt ausdrücklich still — leer ist dort die Absicht, keine Störung.
 
@@ -423,7 +433,7 @@ fast auf einer Ampelstufe; die Begründung samt Messwerten steht in `design/ENTW
 ## Prüfen
 
 ```bash
-npm test     # 575 Tests, Logik und Komponenten
+npm test     # 577 Tests, Logik und Komponenten
 npm run lint
 npm run build
 ```
