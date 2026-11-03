@@ -66,12 +66,11 @@ app.get('/api/board', async () => ({
   weekComponents: config.jira.weekComponents,
 }))
 
-app.get('/api/pipelines', async () => {
+app.get<{ Querystring: { fresh?: string } }>('/api/pipelines', async (request) => {
   guard(Boolean(gitlabToken), 'GITLAB_TOKEN ist nicht gesetzt')
   guard(config.gitlab.groups.length > 0, 'Keine GitLab-Gruppe konfiguriert')
-  return cache.get('pipelines', config.cacheSeconds.gitlab, () =>
-    fetchPipelines(config.gitlab, gitlabToken, deps),
-  )
+  const ttl = request.query.fresh === '1' ? 0 : config.cacheSeconds.gitlab
+  return cache.get('pipelines', ttl, () => fetchPipelines(config.gitlab, gitlabToken, deps))
 })
 
 app.get('/api/mrs', async () => {

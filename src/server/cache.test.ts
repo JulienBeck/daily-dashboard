@@ -77,6 +77,28 @@ describe('StaleCache', () => {
     expect(load).toHaveBeenCalledTimes(2)
   })
 
+  it('bypasses the cached copy at ttl 0, which is what the reload button asks for', async () => {
+    const cache = new StaleCache(() => 1_000_000)
+    const load = vi.fn().mockResolvedValueOnce('a').mockResolvedValueOnce('b')
+
+    await cache.get('k', 60, load)
+
+    expect((await cache.get('k', 0, load)).data).toBe('b')
+    expect(load).toHaveBeenCalledTimes(2)
+  })
+
+  it('still serves the last good value when a forced reload fails', async () => {
+    const cache = new StaleCache(() => 1_000_000)
+    const load = vi.fn().mockResolvedValueOnce('a').mockRejectedValueOnce(new Error('GitLab weg'))
+
+    await cache.get('k', 60, load)
+    const result = await cache.get('k', 0, load)
+
+    expect(result.data).toBe('a')
+    expect(result.stale).toBe(true)
+    expect(result.error).toBe('GitLab weg')
+  })
+
   it('leaves the other keys alone when one is invalidated', async () => {
     const cache = new StaleCache(() => 1_000_000)
     await cache.get('a', 60, () => Promise.resolve(1))

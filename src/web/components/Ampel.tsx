@@ -1,6 +1,7 @@
+import { useState } from 'react'
 import { AMPEL_ORDER, tally } from '../../shared/pipeline.js'
 import type { AmpelState, PipelineRow } from '../../shared/types.js'
-import { STATUS_ICON, StatusWaiting } from '../icons.js'
+import { IconRefresh, STATUS_ICON, StatusWaiting } from '../icons.js'
 
 const LABEL: Record<AmpelState, string> = {
   good: 'grün',
@@ -39,11 +40,24 @@ const tooltip = (row: PipelineRow) =>
     .filter(Boolean)
     .join(' · ')
 
-export function Ampel({ rows, stale }: { rows: PipelineRow[]; stale: boolean }) {
+interface Props {
+  rows: PipelineRow[]
+  stale: boolean
+  onRefresh: () => Promise<void>
+}
+
+export function Ampel({ rows, stale, onRefresh }: Props) {
+  const [busy, setBusy] = useState(false)
   const counts = tally(rows.map((row) => row.state))
   const sorted = [...rows].sort(
     (a, b) => AMPEL_ORDER.indexOf(a.state) - AMPEL_ORDER.indexOf(b.state),
   )
+
+  const refresh = () => {
+    const done = () => setBusy(false)
+    setBusy(true)
+    void onRefresh().then(done, done)
+  }
 
   return (
     <section
@@ -101,6 +115,19 @@ export function Ampel({ rows, stale }: { rows: PipelineRow[]; stale: boolean }) 
         })}
       </ul>
 
+      <button
+        type="button"
+        onClick={refresh}
+        disabled={busy}
+        aria-busy={busy}
+        title={busy ? 'Pipelines werden geladen …' : 'Pipelines jetzt neu laden'}
+        className={[
+          'grid size-7 shrink-0 place-items-center rounded-full border border-white/10 bg-card',
+          'text-sm text-muted hover:text-ink disabled:cursor-progress disabled:hover:text-muted',
+        ].join(' ')}
+      >
+        <IconRefresh className={busy ? 'spin' : undefined} title="Pipelines neu laden" />
+      </button>
     </section>
   )
 }

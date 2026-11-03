@@ -68,7 +68,7 @@ export function App() {
   const board = usePolled(useCallback(() => getBoard(), []), 600)
   const refresh = board.value?.refreshSeconds ?? 60
 
-  const pipelines = usePolled(useCallback(() => getPipelines(), []), refresh)
+  const pipelines = usePolled(useCallback((fresh: boolean) => getPipelines(fresh), []), refresh)
   const mrs = usePolled(useCallback(() => getMergeRequests(), []), refresh)
   const sprint = usePolled(useCallback(() => getSprint(), []), refresh)
   const commits = usePolled(useCallback(() => getCommits(), []), refresh * 5)
@@ -172,7 +172,11 @@ export function App() {
       {pipelines.error ? (
         <Problem what="Pipelines" message={pipelines.error} />
       ) : (
-        <Ampel rows={pipelines.value?.data ?? []} stale={pipelines.value?.stale ?? false} />
+        <Ampel
+          rows={pipelines.value?.data ?? []}
+          stale={pipelines.value?.stale ?? false}
+          onRefresh={pipelines.reload}
+        />
       )}
     </div>
   )

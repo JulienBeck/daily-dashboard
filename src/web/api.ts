@@ -20,8 +20,10 @@ export interface BoardConfig {
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '')
 
-async function get<T>(path: string): Promise<T> {
-  const response = await fetch(`${base}/api${path}`, { headers: { accept: 'application/json' } })
+async function get<T>(path: string, fresh = false): Promise<T> {
+  const response = await fetch(`${base}/api${path}${fresh ? '?fresh=1' : ''}`, {
+    headers: { accept: 'application/json' },
+  })
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as { error?: string }
     throw new Error(body.error ?? `${response.status} ${response.statusText}`)
@@ -43,7 +45,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 export const getBoard = () => get<BoardConfig>('/board')
-export const getPipelines = () => get<Payload<PipelineRow[]>>('/pipelines')
+export const getPipelines = (fresh = false) => get<Payload<PipelineRow[]>>('/pipelines', fresh)
 export const getMergeRequests = () => get<Payload<MergeRequestRow[]>>('/mrs')
 export const getSprint = () => get<Payload<{ sprint: SprintInfo; issues: IssueRow[] }>>('/sprint')
 export const getCommits = () => get<Payload<Record<string, CommitRow[]>>>('/commits')

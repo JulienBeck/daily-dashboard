@@ -25,6 +25,17 @@ describe('usePolled', () => {
     expect(result.current.reload).toBe(first)
   })
 
+  it('asks for fresh data on demand and for cached data while polling', async () => {
+    const load = vi.fn().mockResolvedValue('a')
+    const { result } = renderHook(() => usePolled(load, 600))
+
+    await waitFor(() => expect(result.current.value).toBe('a'))
+    expect(load).toHaveBeenLastCalledWith(false)
+
+    await act(() => result.current.reload())
+    expect(load).toHaveBeenLastCalledWith(true)
+  })
+
   it('keeps the last good value when a reload fails', async () => {
     const load = vi.fn().mockResolvedValueOnce('a').mockRejectedValueOnce(new Error('weg'))
     const { result } = renderHook(() => usePolled(load, 600))

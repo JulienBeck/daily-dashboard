@@ -7,19 +7,19 @@ export interface Polled<T> {
   reload: () => Promise<void>
 }
 
-export function usePolled<T>(load: () => Promise<T>, seconds: number): Polled<T> {
+export function usePolled<T>(load: (fresh: boolean) => Promise<T>, seconds: number): Polled<T> {
   const [state, setState] = useState<Omit<Polled<T>, 'reload'>>({
     value: null,
     error: null,
     loading: true,
   })
-  const run = useRef<() => Promise<void>>(() => Promise.resolve())
+  const run = useRef<(fresh: boolean) => Promise<void>>(() => Promise.resolve())
 
   useEffect(() => {
     let cancelled = false
 
-    run.current = () =>
-      load().then(
+    run.current = (fresh) =>
+      load(fresh).then(
         (value) => {
           if (!cancelled) setState({ value, error: null, loading: false })
         },
@@ -34,15 +34,15 @@ export function usePolled<T>(load: () => Promise<T>, seconds: number): Polled<T>
         },
       )
 
-    void run.current()
-    const timer = setInterval(() => void run.current(), Math.max(5, seconds) * 1000)
+    void run.current(false)
+    const timer = setInterval(() => void run.current(false), Math.max(5, seconds) * 1000)
     return () => {
       cancelled = true
       clearInterval(timer)
     }
   }, [load, seconds])
 
-  const reload = useCallback(() => run.current(), [])
+  const reload = useCallback(() => run.current(true), [])
 
   return { ...state, reload }
 }

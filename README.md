@@ -235,6 +235,26 @@ Merge-Request-Läufe und externe Läufe bleiben außen vor — die gehören nich
 | `absences` | handgepflegte Urlaubsliste mit Zeitraum — siehe „Urlaube eintragen" |
 | `theme.absenceLookaheadDays` | wie weit das Board auf kommende Urlaube vorausschaut, Vorgabe 14 Tage |
 
+## Ampel neu laden
+
+Rechts in der Ampelzeile sitzt ein Knopf, der nur die Pipelines neu holt — ohne Neuladen der
+Seite und ohne die übrigen Kacheln anzufassen. Er hängt am selben `/api/pipelines`, nur mit
+`?fresh=1`.
+
+Der Schalter ist nötig, weil der Proxy die GitLab-Antwort `cacheSeconds.gitlab` lang festhält
+(Vorgabe 60 s, genau der Takt des Pollings): ein reines Neuladen im Browser bekäme meist
+dieselbe zwischengespeicherte Antwort zurück, und der Knopf sähe kaputt aus. `fresh=1` setzt
+die TTL für diesen einen Aufruf auf 0.
+
+| Verhalten | Warum so |
+|---|---|
+| TTL 0 statt Cache leeren | Scheitert GitLab, greift weiterhin der Rückfall auf den letzten guten Stand (`stale`); ein geleerter Cache ließe die Ampel stattdessen in einen 502 laufen |
+| Läuft bereits ein Abruf, wird dessen Ergebnis mitgenommen | Zwei gleichzeitige Sweeps über alle Gruppen kosten GitLab unnötig Arbeit |
+| Der Knopf ist gesperrt, solange er dreht | Verhindert das Hämmern auf die teuerste Abfrage des Boards |
+| Der Polling-Takt bleibt unberührt | Nach dem Knopfdruck läuft das Intervall weiter wie zuvor |
+
+Die anderen Panels haben bewusst keinen: teuer und zeitkritisch ist allein die Ampel.
+
 ## Urlaube eintragen
 
 Solange kein Teamkalender angebunden ist, stehen die Abwesenheiten mit Datum in `absences` —
@@ -382,7 +402,7 @@ fast auf einer Ampelstufe; die Begründung samt Messwerten steht in `design/ENTW
 ## Prüfen
 
 ```bash
-npm test     # 124 Tests, Logik und Komponenten
+npm test     # 563 Tests, Logik und Komponenten
 npm run lint
 npm run build
 ```

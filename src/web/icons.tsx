@@ -216,6 +216,17 @@ export const IconEpic = (props: IconProps) => (
   </Svg>
 )
 
+export const IconRefresh = (props: IconProps) => (
+  <Svg {...props}>
+    <g {...stroke}>
+      <path d="M4.76 10.06a7.5 7.5 0 0 1 14.48 0" />
+      <path d="M19.73 7.3 19.24 10.06 17.44 7.92" />
+      <path d="M19.24 13.94a7.5 7.5 0 0 1-14.48 0" />
+      <path d="M4.27 16.7 4.76 13.94 6.56 16.08" />
+    </g>
+  </Svg>
+)
+
 export const IconStale = (props: IconProps) => (
   <Svg {...props}>
     <g {...stroke}>
