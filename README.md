@@ -331,6 +331,27 @@ sichersten vergessen hat.
 Die Regel greift also nur dort, wo das Stundenfenster zu kurz wird, und ändert den Rest der Woche
 nichts. Wer sie nicht will, setzt den Schlüssel auf `false`.
 
+### Wenn unter einem Namen nichts steht
+
+Ein leerer Eintrag hatte drei völlig verschiedene Ursachen und sah dreimal gleich aus. Deshalb
+fragt der Proxy nach, **sobald ein Ereignis-Abruf leer zurückkommt** — im Normalfall kostet das
+keine einzige zusätzliche Anfrage:
+
+| Fall | Woran der Proxy ihn erkennt | Was im Board steht |
+|---|---|---|
+| Name falsch geschrieben | `/users?username=<name>` findet niemanden | `GitLab kennt keinen Benutzer „…" — der Token gehört „…"` |
+| Name richtig, nichts gepusht | derselbe Aufruf findet den Benutzer | `„…" gibt es, liefert aber keine sichtbaren Pushes` |
+| `gitlabUser: true` im Deployment | `/user` nennt den Token-Besitzer | `der Token gehört „…" … bei einem Gruppen-Token ist das dessen Bot-Benutzer` |
+
+**Der Name des Token-Besitzers ist dabei die Antwort auf die häufigste Frage überhaupt**: wie der
+eigene GitLab-Handle geschrieben wird. Er steht im Proxy-Log und, wenn er den Fall erklärt, als
+Zeile unter dem Namen im Board.
+
+Wer `gitlabUser` versehentlich auf eine **Mailadresse** setzt, bekommt genau diese Zeile: GitLabs
+`/users/:id` nimmt ID oder Benutzername, und ein `@` kommt in keinem Benutzernamen vor.
+
+Eine Person ohne `gitlabUser` bleibt ausdrücklich still — leer ist dort die Absicht, keine Störung.
+
 Antwortet `/api/commits` oder `/api/calendar` gar nicht, steht der Grund als Zeile in der Kachel.
 Ohne das sieht eine kaputte Quelle genauso aus wie ein ruhiger Tag, und man sucht den Fehler an
 der falschen Stelle. Welche Quelle für wen leer bleibt, steht zusätzlich im Proxy-Log.
@@ -402,7 +423,7 @@ fast auf einer Ampelstufe; die Begründung samt Messwerten steht in `design/ENTW
 ## Prüfen
 
 ```bash
-npm test     # 563 Tests, Logik und Komponenten
+npm test     # 575 Tests, Logik und Komponenten
 npm run lint
 npm run build
 ```

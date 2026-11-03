@@ -55,7 +55,11 @@ const render0 = (
   team: TeamMember[],
   commits: Record<string, CommitRow[]> = {},
   calendar: CalendarByMember = {},
-  errors: { commitsError?: string | null; calendarError?: string | null } = {},
+  errors: {
+    commitsError?: string | null
+    calendarError?: string | null
+    commitProblems?: Record<string, string>
+  } = {},
 ) => render(<People team={team} commits={commits} calendar={calendar} {...errors} />)
 
 beforeEach(() => localStorage.clear())
@@ -319,5 +323,24 @@ describe('People', () => {
     render0([member()], { 'J. Beck': [commit()] })
     expect(screen.queryByText(/^Commits:/)).not.toBeInTheDocument()
     expect(screen.queryByText(/^Kalender:/)).not.toBeInTheDocument()
+  })
+
+  it('writes the reason under the name instead of leaving it empty', () => {
+    render0([member()], {}, {}, { commitProblems: { 'J. Beck': 'GitLab kennt „j.beck" nicht' } })
+    expect(screen.getByText('GitLab kennt „j.beck" nicht')).toBeInTheDocument()
+  })
+
+  it('blames nobody who simply pushed nothing', () => {
+    render0([member({ name: 'Timo' }), member()], {}, {}, {
+      commitProblems: { 'J. Beck': 'GitLab kennt „j.beck" nicht' },
+    })
+    const timo = screen.getByText('Timo').closest('li')!
+    expect(within(timo).queryByText(/GitLab kennt/)).not.toBeInTheDocument()
+  })
+
+  it('shows the reason even though there is nothing to unfold', () => {
+    render0([member()], {}, {}, { commitProblems: { 'J. Beck': 'GitLab kennt „j.beck" nicht' } })
+    expect(screen.getByRole('button', { name: /J\. Beck/ })).toBeDisabled()
+    expect(screen.getByText('GitLab kennt „j.beck" nicht')).toBeVisible()
   })
 })

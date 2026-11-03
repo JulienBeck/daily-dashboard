@@ -1,7 +1,7 @@
 import type {
   BurndownPayload,
   CalendarByMember,
-  CommitRow,
+  CommitsPayload,
   EpicsPayload,
   IssueRow,
   MergeRequestRow,
@@ -48,7 +48,7 @@ export const getBoard = () => get<BoardConfig>('/board')
 export const getPipelines = (fresh = false) => get<Payload<PipelineRow[]>>('/pipelines', fresh)
 export const getMergeRequests = () => get<Payload<MergeRequestRow[]>>('/mrs')
 export const getSprint = () => get<Payload<{ sprint: SprintInfo; issues: IssueRow[] }>>('/sprint')
-export const getCommits = () => get<Payload<Record<string, CommitRow[]>>>('/commits')
+export const getCommits = () => get<Payload<CommitsPayload>>('/commits')
 export const getCalendar = () => get<Payload<CalendarByMember>>('/calendar')
 export const getEpics = () => get<Payload<EpicsPayload>>('/epics')
 export const getBurndown = () => get<Payload<BurndownPayload>>('/burndown')

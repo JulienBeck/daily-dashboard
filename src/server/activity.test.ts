@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  asUser,
   cutoffOf,
+  diagnoseEmptyFeed,
   eventPath,
   eventsInWindow,
   fetchCommits,
@@ -8,6 +10,7 @@ import {
   missingProjectIds,
   sinceOf,
   toCommitRows,
+  type GitlabUser,
   type PushEvent,
 } from './activity.js'
 
@@ -172,7 +175,7 @@ describe('fetchCommits', () => {
       36,
       5,
     )
-    expect(result).toEqual({ Timo: [] })
+    expect(result).toEqual({ byMember: { Timo: [] }, problems: {} })
     // one call for the project list, none for the member
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
@@ -191,7 +194,8 @@ describe('fetchCommits', () => {
       36,
       5,
     )
-    expect(fetchMock).toHaveBeenCalledTimes(3)
+    const events = fetchMock.mock.calls.filter((call) => String(call[0]).includes('/events'))
+    expect(events).toHaveLength(2)
   })
 
   const monday = { fetch: null as never, now: () => MONDAY }
@@ -211,7 +215,7 @@ describe('fetchCommits', () => {
       36,
       5,
     )
-    expect(result.Julien).toEqual([])
+    expect(result.byMember.Julien).toEqual([])
   })
 
   it('keeps fridays push on a monday and asks gitlab far enough back', async () => {
@@ -231,8 +235,8 @@ describe('fetchCommits', () => {
     )
 
     expect(String(fetchMock.mock.calls[1]![0])).toContain('after=2026-10-29')
-    expect(result.Julien).toHaveLength(1)
-    expect(result.Julien![0]!.project).toBe('ki-backend')
+    expect(result.byMember.Julien).toHaveLength(1)
+    expect(result.byMember.Julien![0]!.project).toBe('ki-backend')
   })
 })
 
@@ -265,20 +269,55 @@ describe('fetchCommits logging', () => {
     expect(lines).toContain('keinen gitlabUser')
   })
 
-  it('suspects a group token out loud when the own event feed is empty', async () => {
+  const byUrl = (owner: unknown, lookup: unknown = []) =>
+    vi.fn((url: string) => {
+      if (String(url).endsWith('/api/v4/user')) return Promise.resolve(ok(owner))
+      if (String(url).includes('username=')) return Promise.resolve(ok(lookup))
+      return Promise.resolve(ok([]))
+    })
+
+  it('names the token owner when the own event feed is empty', async () => {
     const lines = await run(
       [{ name: 'Julien', gitlabUser: null, self: true }],
-      vi.fn().mockResolvedValue(ok([])),
+      byUrl({ id: 9, username: 'group_770_bot' }),
     )
+    expect(lines).toContain('group_770_bot')
     expect(lines).toContain('Bot-Benutzer')
   })
 
-  it('names the queried username when a foreign feed is empty', async () => {
+  it('says outright that GitLab does not know the configured name', async () => {
+    const lines = await run(
+      [{ name: 'Timo', gitlabUser: 'tippfehler', self: false }],
+      byUrl({ id: 9, username: 't.krause' }, []),
+    )
+    expect(lines).toContain('kennt keinen Benutzer „tippfehler"')
+    expect(lines).toContain('t.krause')
+  })
+
+  it('separates a name that exists from one that does not', async () => {
     const lines = await run(
       [{ name: 'Timo', gitlabUser: 'timo', self: false }],
-      vi.fn().mockResolvedValue(ok([])),
+      byUrl(null, [{ id: 4, username: 'timo' }]),
     )
-    expect(lines).toContain('/users/timo/events')
+    expect(lines).toContain('gibt es, liefert aber keine sichtbaren Pushes')
+    expect(lines).not.toContain('kennt keinen Benutzer')
+  })
+
+  it('hands the same reason to the board, not only to the log', async () => {
+    const result = await fetchCommits(
+      { baseUrl: 'https://git.example.com' } as never,
+      't',
+      { fetch: byUrl({ id: 9, username: 't.krause' }, []) as never, now: () => new Date(2026, 9, 19) },
+      [
+        { name: 'Timo', gitlabUser: 'tippfehler', self: false },
+        { name: 'Daniel', gitlabUser: null, self: false },
+      ],
+      36,
+      5,
+    )
+
+    expect(result.problems.Timo).toContain('kennt keinen Benutzer „tippfehler"')
+    expect(result.problems.Daniel).toBeUndefined()
   })
 
   it('reports a failing request instead of swallowing it', async () => {
@@ -304,6 +343,72 @@ describe('fetchCommits logging', () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(ok([])).mockResolvedValueOnce(ok([push()]))
     const lines = await run([{ name: 'Timo', gitlabUser: 'timo', self: false }], fetchMock)
     expect(lines).toBe('')
+  })
+})
+
+describe('diagnoseEmptyFeed', () => {
+  const bot: GitlabUser = { id: 9, username: 'group_770_bot' }
+  const owner = (user: GitlabUser | null) => () => Promise.resolve(user)
+  const lookup = (result: GitlabUser[] | null) => () => Promise.resolve(result)
+
+  it('names the token owner when the board reads its own feed', async () => {
+    const message = await diagnoseEmptyFeed(
+      { gitlabUser: null, self: true },
+      owner(bot),
+      lookup([]),
+    )
+    expect(message).toContain('group_770_bot')
+  })
+
+  it('admits it cannot tell when even the owner is unreadable', async () => {
+    const message = await diagnoseEmptyFeed(
+      { gitlabUser: null, self: true },
+      owner(null),
+      lookup([]),
+    )
+    expect(message).toContain('nicht ermitteln')
+  })
+
+  it('calls a name that GitLab does not know exactly that', async () => {
+    const message = await diagnoseEmptyFeed(
+      { gitlabUser: 'tippfehler', self: false },
+      owner({ id: 1, username: 'j.beck' }),
+      lookup([]),
+    )
+    expect(message).toContain('kennt keinen Benutzer „tippfehler"')
+    expect(message).toContain('j.beck')
+  })
+
+  it('does not blame the name when the user exists', async () => {
+    const message = await diagnoseEmptyFeed(
+      { gitlabUser: 'timo', self: false },
+      owner(bot),
+      lookup([{ id: 4, username: 'timo' }]),
+    )
+    expect(message).toContain('gibt es')
+    expect(message).not.toContain('kennt keinen')
+  })
+
+  it('claims nothing when the lookup itself failed', async () => {
+    const message = await diagnoseEmptyFeed(
+      { gitlabUser: 'timo', self: false },
+      owner(bot),
+      lookup(null),
+    )
+    expect(message).toContain('nicht nachschlagen')
+    expect(message).not.toContain('kennt keinen')
+  })
+})
+
+describe('asUser', () => {
+  it('takes a user object', () => {
+    expect(asUser({ id: 1, username: 'j.beck' })?.username).toBe('j.beck')
+  })
+
+  it('refuses anything without a username, so a list never passes for a user', () => {
+    expect(asUser([])).toBeNull()
+    expect(asUser(null)).toBeNull()
+    expect(asUser({ id: 1 })).toBeNull()
   })
 })
 
@@ -355,7 +460,7 @@ describe('fetchCommits project names', () => {
     )
 
     expect(String(fetchMock.mock.calls[2]![0])).toContain('/projects/77')
-    expect(result.Julien![0]!.project).toBe('daily-dashboard')
+    expect(result.byMember.Julien![0]!.project).toBe('daily-dashboard')
   })
 
   it('looks nothing up when the membership list already knows the project', async () => {
@@ -367,7 +472,7 @@ describe('fetchCommits project names', () => {
     const result = await fetchCommits(config, 't', { ...deps(), fetch: fetchMock as never }, member, 36, 5)
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(result.Julien![0]!.project).toBe('ki-backend')
+    expect(result.byMember.Julien![0]!.project).toBe('ki-backend')
   })
 
   it('keeps the dash when even the lookup fails, instead of losing the commit', async () => {
@@ -379,8 +484,8 @@ describe('fetchCommits project names', () => {
 
     const result = await fetchCommits(config, 't', { ...deps(), fetch: fetchMock as never }, member, 36, 5)
 
-    expect(result.Julien).toHaveLength(1)
-    expect(result.Julien![0]!.project).toBe('—')
+    expect(result.byMember.Julien).toHaveLength(1)
+    expect(result.byMember.Julien![0]!.project).toBe('—')
   })
 })
 

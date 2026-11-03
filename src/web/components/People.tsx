@@ -11,6 +11,7 @@ import { IconChevron, IconMerge, IconPeople, IconStale, IconTimer } from '../ico
 interface Props {
   team: TeamMember[]
   commits: Record<string, CommitRow[]>
+  commitProblems?: Record<string, string>
   calendar: CalendarByMember
   commitsError?: string | null
   calendarError?: string | null
@@ -69,7 +70,14 @@ function Line({
   )
 }
 
-export function People({ team, commits, calendar, commitsError, calendarError }: Props) {
+export function People({
+  team,
+  commits,
+  commitProblems = {},
+  calendar,
+  commitsError,
+  calendarError,
+}: Props) {
   const present = team.filter((member) => awayOf(member, calendar) === null).length
   const [open, setOpen] = useState<Record<string, boolean>>(() => {
     try {
@@ -118,6 +126,7 @@ export function People({ team, commits, calendar, commitsError, calendarError }:
           const away = awayOf(member, calendar)
           const soon = away ? null : nextAwayOf(member.nextAway)
           const pushes = commits[member.name] ?? []
+          const problem = commitProblems[member.name]
           const day = calendar[member.name]
           const agenda = [
             ...(day?.yesterday ?? []).map((entry) => ({ entry, yesterday: true })),
@@ -182,6 +191,15 @@ export function People({ team, commits, calendar, commitsError, calendarError }:
                   </span>
                 ) : null}
               </button>
+
+              {problem ? (
+                <p className="mt-1 ml-[34px] flex items-baseline gap-1.5 text-[11px] text-serious">
+                  <IconStale className="shrink-0 translate-y-0.5 text-[11px]" />
+                  <span className="truncate" title={problem}>
+                    {problem}
+                  </span>
+                </p>
+              ) : null}
 
               {expanded && count > 0 ? (
                 <ul className="mt-1 ml-[34px] grid gap-0.5 border-l border-rule pl-2.5" role="list">

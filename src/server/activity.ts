@@ -1,6 +1,12 @@
-import type { CommitRow } from '../shared/types.js'
+import type { CommitRow, CommitsPayload } from '../shared/types.js'
 import type { GitlabConfig } from './config.js'
 import type { GitlabDeps } from './gitlab.js'
+
+export interface GitlabUser {
+  id: number
+  username: string
+  name?: string
+}
 
 export interface PushEvent {
   created_at: string
@@ -130,6 +136,34 @@ export function eventPath(
   return null
 }
 
+export function asUser(value: unknown): GitlabUser | null {
+  const user = value as GitlabUser | null
+  return user && typeof user === 'object' && typeof user.username === 'string' ? user : null
+}
+
+export async function diagnoseEmptyFeed(
+  member: { gitlabUser: string | null; self: boolean },
+  owner: () => Promise<GitlabUser | null>,
+  lookup: (handle: string) => Promise<GitlabUser[] | null>,
+): Promise<string> {
+  if (member.self) {
+    const user = await owner()
+    return user
+      ? `der Token gehört „${user.username}", und dieser Benutzer hat nichts gepusht — bei einem Gruppen-Token ist das dessen Bot-Benutzer`
+      : 'der Token-Besitzer ließ sich nicht ermitteln'
+  }
+
+  const handle = member.gitlabUser ?? ''
+  const found = await lookup(handle)
+  if (found === null) return `„${handle}" ließ sich bei GitLab nicht nachschlagen`
+  if (found.length > 0) return `„${handle}" gibt es, liefert aber keine sichtbaren Pushes`
+
+  const user = await owner()
+  return user
+    ? `GitLab kennt keinen Benutzer „${handle}" — der Token gehört „${user.username}"`
+    : `GitLab kennt keinen Benutzer „${handle}"`
+}
+
 export async function fetchCommits(
   config: GitlabConfig,
   token: string,
@@ -138,7 +172,7 @@ export async function fetchCommits(
   hours: number,
   limit: number,
   sinceLastWorkday = false,
-): Promise<Record<string, CommitRow[]>> {
+): Promise<CommitsPayload> {
   const now = deps.now()
   const cutoff = cutoffOf(now, hours, sinceLastWorkday)
   const since = sinceOf(now, hours, sinceLastWorkday)
@@ -150,12 +184,25 @@ export async function fetchCommits(
   ).catch(() => [])
   const names = new Map(projects.map((project) => [project.id, project.name]))
 
+  let ownerOnce: Promise<GitlabUser | null> | null = null
+  const owner = () =>
+    (ownerOnce ??= rest<unknown>(config, token, deps, '/user').then(asUser, () => null))
+
+  const lookup = (handle: string) =>
+    rest<unknown>(config, token, deps, `/users?username=${encodeURIComponent(handle)}`).then(
+      (value) =>
+        Array.isArray(value)
+          ? value.map(asUser).filter((user): user is GitlabUser => user !== null)
+          : [],
+      () => null,
+    )
+
   const pushes = await Promise.all(
     members.map(async (member) => {
       const path = eventPath(member, since)
       if (path === null) {
         deps.log?.(`GitLab: ${member.name} hat keinen gitlabUser, keine Commits geholt`)
-        return [member.name, [] as PushEvent[]] as const
+        return [member.name, [] as PushEvent[], null] as const
       }
 
       const events = await rest<PushEvent[]>(config, token, deps, path).catch((error: unknown) => {
@@ -165,16 +212,16 @@ export async function fetchCommits(
 
       const inWindow = eventsInWindow(events, cutoff)
       if (events.length === 0) {
-        deps.log?.(
-          member.self
-            ? `GitLab: /events ist leer — gehört der Token wirklich ${member.name}? Ein Gruppen-Token liefert hier die Ereignisse seines Bot-Benutzers`
-            : `GitLab: /users/${member.gitlabUser}/events ist leer — Benutzername richtig geschrieben?`,
-        )
-      } else if (inWindow.length === 0) {
+        const problem = await diagnoseEmptyFeed(member, owner, lookup)
+        deps.log?.(`GitLab: keine Commits für ${member.name} — ${problem}`)
+        return [member.name, inWindow, problem] as const
+      }
+
+      if (inWindow.length === 0) {
         deps.log?.(`GitLab: ${member.name} hat ${events.length} Pushes, aber keinen im Fenster`)
       }
 
-      return [member.name, inWindow] as const
+      return [member.name, inWindow, null] as const
     }),
   )
 
@@ -188,7 +235,14 @@ export async function fetchCommits(
     names.set(id, name)
   }
 
-  return Object.fromEntries(
-    pushes.map(([member, events]) => [member, toCommitRows(events, names, limit)]),
-  )
+  return {
+    byMember: Object.fromEntries(
+      pushes.map(([member, events]) => [member, toCommitRows(events, names, limit)]),
+    ),
+    problems: Object.fromEntries(
+      pushes
+        .filter((entry): entry is readonly [string, PushEvent[], string] => entry[2] !== null)
+        .map(([member, , problem]) => [member, problem]),
+    ),
+  }
 }

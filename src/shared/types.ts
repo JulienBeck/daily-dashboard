@@ -125,6 +125,11 @@ export interface CommitRow {
   at: string
 }
 
+export interface CommitsPayload {
+  byMember: Record<string, CommitRow[]>
+  problems: Record<string, string>
+}
+
 export interface Payload<T> {
   data: T
   fetchedAt: string

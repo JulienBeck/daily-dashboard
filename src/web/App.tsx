@@ -139,7 +139,8 @@ export function App() {
           ) : null}
           <People
             team={board.value?.team ?? []}
-            commits={commits.value?.data ?? {}}
+            commits={commits.value?.data.byMember ?? {}}
+            commitProblems={commits.value?.data.problems ?? {}}
             calendar={calendar.value?.data ?? {}}
             commitsError={commits.error}
             calendarError={calendar.error}
