@@ -58,3 +58,6 @@ export const moveIssue = (key: string, lane: IssueRow['lane']) =>
     `/issues/${encodeURIComponent(key)}/lane`,
     { lane },
   )
+
+export const moveIssueToWeek = (key: string, week: string | null) =>
+  post<{ key: string; week: string | null }>(`/issues/${encodeURIComponent(key)}/week`, { week })

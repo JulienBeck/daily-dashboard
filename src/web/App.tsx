@@ -18,6 +18,7 @@ import {
   getPipelines,
   getSprint,
   moveIssue,
+  moveIssueToWeek,
 } from './api.js'
 import { usePolled } from './usePolled.js'
 import { Ampel } from './components/Ampel.js'
@@ -101,6 +102,14 @@ export function App() {
     [reloadSprint],
   )
 
+  const onWeek = useCallback(
+    async (key: string, week: string | null) => {
+      await moveIssueToWeek(key, week)
+      await reloadSprint()
+    },
+    [reloadSprint],
+  )
+
   const onDismiss = () => {
     localStorage.setItem(dismissKey(start.toISOString()), todayStamp(clock))
     setDismissed(true)
@@ -156,6 +165,7 @@ export function App() {
               weeks={board.value?.weekComponents ?? []}
               workdaysLeft={sprint.value?.data.sprint.workdaysLeft ?? null}
               onMove={onMove}
+              onWeek={onWeek}
             />
           )}
         </div>

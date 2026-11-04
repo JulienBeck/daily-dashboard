@@ -150,16 +150,17 @@ export async function call<T>(
   return (await response.json()) as T
 }
 
-async function post(
+async function send(
   config: JiraConfig,
   credentials: JiraCredentials,
   flavor: 'server' | 'cloud',
   deps: JiraDeps,
+  method: 'POST' | 'PUT',
   path: string,
   body: unknown,
 ): Promise<void> {
   const response = await deps.fetch(`${config.baseUrl}${path}`, {
-    method: 'POST',
+    method,
     headers: {
       accept: 'application/json',
       'content-type': 'application/json',
@@ -242,11 +243,60 @@ export async function moveIssue(
     )
   }
 
-  await post(config, credentials, flavor, deps, `/rest/api/${version}/issue/${key}/transitions`, {
-    transition: { id: picked.id },
-  })
+  await send(
+    config,
+    credentials,
+    flavor,
+    deps,
+    'POST',
+    `/rest/api/${version}/issue/${key}/transitions`,
+    { transition: { id: picked.id } },
+  )
 
   return { key, lane, status: picked.to?.name ?? picked.name }
+}
+
+export function isWeek(value: unknown, weeks: readonly string[]): value is string | null {
+  return value === null || (typeof value === 'string' && weeks.includes(value))
+}
+
+export function componentsFor(
+  current: readonly { name?: string }[] | undefined,
+  weeks: readonly string[],
+  week: string | null,
+): { name: string }[] {
+  const normalise = (value: string) => value.trim().toLowerCase()
+  const isWeekName = (name: string) => weeks.some((wanted) => normalise(wanted) === normalise(name))
+  const kept = (current ?? [])
+    .map((component) => component.name ?? '')
+    .filter((name) => name !== '' && !isWeekName(name))
+  return [...kept, ...(week ? [week] : [])].map((name) => ({ name }))
+}
+
+export async function setIssueWeek(
+  config: JiraConfig,
+  credentials: JiraCredentials,
+  deps: JiraDeps,
+  key: string,
+  week: string | null,
+): Promise<{ key: string; week: string | null }> {
+  const flavor = await detectFlavor(config, credentials, deps)
+  const version = apiPath(flavor)
+
+  const issue = await call<JiraIssue>(
+    config,
+    credentials,
+    flavor,
+    deps,
+    `/rest/api/${version}/issue/${key}?fields=components`,
+  )
+  const components = componentsFor(issue.fields.components, config.weekComponents, week)
+
+  await send(config, credentials, flavor, deps, 'PUT', `/rest/api/${version}/issue/${key}`, {
+    fields: { components },
+  })
+
+  return { key, week }
 }
 
 export function sameOrigin(candidate: string, baseUrl: string): boolean {

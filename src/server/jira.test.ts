@@ -4,6 +4,7 @@ import {
   apiPath,
   authHeader,
   avatarUrl,
+  componentsFor,
   detectFlavor,
   sameOrigin,
   toEpicRows,
@@ -17,10 +18,12 @@ import {
   userSearchPath,
   isIssueKey,
   isLane,
+  isWeek,
   laneOf,
   moveIssue,
   pickStoryPointsField,
   pickTransition,
+  setIssueWeek,
   summarise,
   toIssueRows,
   weekOf,
@@ -693,6 +696,103 @@ describe('moveIssue', () => {
     await expect(
       moveIssue(server, credentials, { fetch: fetchMock as never, now: () => now }, 'PRO-7', 'done'),
     ).rejects.toThrow(/403/)
+  })
+})
+
+describe('componentsFor', () => {
+  const weeks = ['Woche 1', 'Woche 2']
+
+  it('replaces the week the issue was in', () => {
+    expect(componentsFor([{ name: 'Woche 1' }], weeks, 'Woche 2')).toEqual([{ name: 'Woche 2' }])
+  })
+
+  it('keeps every component that is not a week', () => {
+    expect(componentsFor([{ name: 'Backend' }, { name: 'Woche 1' }], weeks, 'Woche 2')).toEqual([
+      { name: 'Backend' },
+      { name: 'Woche 2' },
+    ])
+  })
+
+  it('drops the week without adding one when the card leaves both weeks', () => {
+    expect(componentsFor([{ name: 'Backend' }, { name: 'Woche 2' }], weeks, null)).toEqual([
+      { name: 'Backend' },
+    ])
+  })
+
+  it('matches a week whose spelling differs in case and spacing', () => {
+    expect(componentsFor([{ name: ' woche 1 ' }], weeks, 'Woche 2')).toEqual([{ name: 'Woche 2' }])
+  })
+
+  it('adds the week to an issue that had no component at all', () => {
+    expect(componentsFor(undefined, weeks, 'Woche 1')).toEqual([{ name: 'Woche 1' }])
+  })
+})
+
+describe('isWeek', () => {
+  it('accepts a configured week', () => {
+    expect(isWeek('Woche 2', ['Woche 1', 'Woche 2'])).toBe(true)
+  })
+
+  it('accepts null, which means the card belongs to no week', () => {
+    expect(isWeek(null, ['Woche 1'])).toBe(true)
+  })
+
+  it('refuses a name the configuration does not know', () => {
+    expect(isWeek('Backend', ['Woche 1', 'Woche 2'])).toBe(false)
+  })
+
+  it('refuses something that is not a string', () => {
+    expect(isWeek(7, ['Woche 1'])).toBe(false)
+  })
+})
+
+describe('setIssueWeek', () => {
+  const ok = (body: unknown) => ({ ok: true, json: async () => body }) as Response
+  const server = { ...config, flavor: 'server' as const, weekComponents: ['Woche 1', 'Woche 2'] }
+  const credentials = { token: 't', email: null }
+  const deps = (fetchMock: unknown) => ({ fetch: fetchMock as never, now: () => now })
+
+  it('writes the components back with the new week', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok({ key: 'PRO-7', fields: { components: [{ name: 'Woche 1' }] } }))
+      .mockResolvedValueOnce(ok({}))
+
+    const result = await setIssueWeek(server, credentials, deps(fetchMock), 'PRO-7', 'Woche 2')
+
+    const [url, init] = fetchMock.mock.calls[1]!
+    expect(String(url)).toBe('https://jira.example.com/rest/api/2/issue/PRO-7')
+    expect(init.method).toBe('PUT')
+    expect(JSON.parse(init.body)).toEqual({ fields: { components: [{ name: 'Woche 2' }] } })
+    expect(result).toEqual({ key: 'PRO-7', week: 'Woche 2' })
+  })
+
+  it('reads the current components first, so foreign ones are not lost', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok({ key: 'PRO-7', fields: { components: [{ name: 'Backend' }] } }))
+      .mockResolvedValueOnce(ok({}))
+
+    await setIssueWeek(server, credentials, deps(fetchMock), 'PRO-7', 'Woche 1')
+
+    expect(String(fetchMock.mock.calls[0]![0])).toBe(
+      'https://jira.example.com/rest/api/2/issue/PRO-7?fields=components',
+    )
+    expect(JSON.parse(fetchMock.mock.calls[1]![1].body).fields.components).toEqual([
+      { name: 'Backend' },
+      { name: 'Woche 1' },
+    ])
+  })
+
+  it('passes a refused write on instead of reporting success', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(ok({ key: 'PRO-7', fields: { components: [] } }))
+      .mockResolvedValueOnce({ ok: false, status: 400, statusText: 'Bad Request' } as Response)
+
+    await expect(
+      setIssueWeek(server, credentials, deps(fetchMock), 'PRO-7', 'Woche 2'),
+    ).rejects.toThrow(/400/)
   })
 })
 

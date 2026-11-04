@@ -1,6 +1,8 @@
 node_modules/
 dist/
 dist-server/
+# Incremental build state, rewritten by every tsc -b run.
+*.tsbuildinfo
 .env
 *.local
 dashboard.config.local.json

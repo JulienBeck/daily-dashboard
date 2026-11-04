@@ -10,17 +10,26 @@ const LANES = [
   { key: 'done' as const, label: 'Erledigt' },
 ]
 
+export const REST = 'ohne Woche'
+
 export interface Band {
   label: string
   issues: IssueRow[]
 }
 
-export type Moves = Record<string, Lane>
+export interface Move {
+  lane?: Lane
+  week?: string | null
+}
+
+export type Moves = Record<string, Move>
 
 export function applyMoves(issues: readonly IssueRow[], moves: Moves): IssueRow[] {
   return issues.map((issue) => {
-    const lane = moves[issue.key]
-    return lane && lane !== issue.lane ? { ...issue, lane } : issue
+    const move = moves[issue.key]
+    if (!move) return issue
+    const next = { ...issue, ...move }
+    return next.lane === issue.lane && next.week === issue.week ? issue : next
   })
 }
 
@@ -30,8 +39,8 @@ export function bandsOf(issues: readonly IssueRow[], weeks: readonly string[]): 
     issues: issues.filter((issue) => issue.week === label),
   }))
   const rest = issues.filter((issue) => issue.week === null)
-  if (rest.length > 0) bands.push({ label: 'ohne Woche', issues: rest })
-  return bands.filter((band) => band.issues.length > 0)
+  if (rest.length > 0) bands.push({ label: REST, issues: rest })
+  return bands
 }
 
 const WEEK_WORKDAYS = 5
@@ -42,7 +51,9 @@ export function openBand(
   workdaysLeft: number | null,
 ): string | null {
   const wanted = workdaysLeft != null && workdaysLeft <= WEEK_WORKDAYS ? weeks[1] : weeks[0]
-  const band = bands.find((candidate) => candidate.label === wanted) ?? bands[0]
+  const current = bands.find((candidate) => candidate.label === wanted)
+  const filled = bands.find((candidate) => candidate.issues.length > 0)
+  const band = current?.issues.length ? current : (filled ?? bands[0])
   return band?.label ?? null
 }
 
@@ -116,11 +127,13 @@ export function Stories({
   weeks,
   workdaysLeft = null,
   onMove,
+  onWeek,
 }: {
   issues: IssueRow[]
   weeks: string[]
   workdaysLeft?: number | null
   onMove?: (key: string, lane: Lane) => Promise<unknown>
+  onWeek?: (key: string, week: string | null) => Promise<unknown>
 }) {
   const [moves, setMoves] = useState<Moves>({})
   const [dragging, setDragging] = useState<string | null>(null)
@@ -140,20 +153,33 @@ export function Stories({
       return rest
     })
 
-  const drop = (lane: Lane, key: string) => {
-    setOver(null)
-    setDragging(null)
-    const issue = shown.find((row) => row.key === key)
-    if (!onMove || !issue || issue.lane === lane) return
+  const run = (key: string, move: Move, call: Promise<unknown>) => {
     setError(null)
-    setMoves((previous) => ({ ...previous, [key]: lane }))
-    void onMove(key, lane).then(
+    setMoves((previous) => ({ ...previous, [key]: move }))
+    void call.then(
       () => forget(key),
       (reason: unknown) => {
         forget(key)
         setError(reason instanceof Error ? reason.message : String(reason))
       },
     )
+  }
+
+  const drop = (lane: Lane, key: string) => {
+    setOver(null)
+    setDragging(null)
+    const issue = shown.find((row) => row.key === key)
+    if (!onMove || !issue || issue.lane === lane) return
+    run(key, { lane }, onMove(key, lane))
+  }
+
+  const dropOnWeek = (week: string | null, key: string) => {
+    setOver(null)
+    setDragging(null)
+    const issue = shown.find((row) => row.key === key)
+    if (!onWeek || !issue || issue.week === week) return
+    setPicked(open)
+    run(key, { week }, onWeek(key, week))
   }
 
   return (
@@ -195,12 +221,34 @@ export function Stories({
       >
         {bands.map((band) => {
           const expanded = band.label === open
+          const week = band.label === REST ? null : band.label
+          const headZone = `week:${band.label}`
           return (
             <div
               key={band.label}
               className={`grid min-h-0 ${expanded ? 'grid-rows-[auto_1fr]' : 'grid-rows-[auto]'}`}
             >
-              <div className="mb-1.5 flex items-center gap-2">
+              <div
+                onDragOver={(event) => {
+                  if (!onWeek || !dragging) return
+                  event.preventDefault()
+                  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+                  setOver(headZone)
+                }}
+                onDragLeave={() => setOver((current) => (current === headZone ? null : current))}
+                onDrop={(event) => {
+                  event.preventDefault()
+                  const key = event.dataTransfer?.getData('text/plain') || dragging
+                  if (key) dropOnWeek(week, key)
+                }}
+                className={`mb-1.5 flex items-center gap-2 rounded border border-dashed px-1 ${
+                  over === headZone
+                    ? 'border-accent bg-accent/5'
+                    : dragging && onWeek
+                      ? 'border-rule'
+                      : 'border-transparent'
+                }`}
+              >
                 <button
                   type="button"
                   aria-expanded={expanded}

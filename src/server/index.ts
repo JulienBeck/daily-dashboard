@@ -13,7 +13,9 @@ import {
   fetchTeamAvatars,
   isIssueKey,
   isLane,
+  isWeek,
   moveIssue,
+  setIssueWeek,
 } from './jira.js'
 
 const config = loadConfig()
@@ -163,6 +165,25 @@ app.post<{ Params: { key: string }; Body: { lane?: string } }>(
     // The board polls the cached sprint; without this the card would snap back.
     cache.invalidate('sprint')
     cache.invalidate('burndown')
+    return moved
+  },
+)
+
+app.post<{ Params: { key: string }; Body: { week?: unknown } }>(
+  '/api/issues/:key/week',
+  async (request) => {
+    guard(Boolean(jiraCredentials.token), 'JIRA_TOKEN ist nicht gesetzt')
+    guard(isIssueKey(request.params.key), 'Kein gültiger Jira-Schlüssel')
+    const week = request.body?.week
+    guard(isWeek(week, config.jira.weekComponents), 'Unbekannte Woche')
+    const moved = await setIssueWeek(
+      config.jira,
+      jiraCredentials,
+      deps,
+      request.params.key,
+      week as string | null,
+    )
+    cache.invalidate('sprint')
     return moved
   },
 )

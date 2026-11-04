@@ -28,18 +28,19 @@ describe('bandsOf', () => {
     expect(bands.map((band) => band.label)).toEqual(['Woche 1', 'Woche 2'])
   })
 
-  it('drops a week that holds nothing, so an empty band costs no height', () => {
+  it('keeps an empty week, so a card can still be dropped into it', () => {
     const bands = bandsOf([issue({ week: 'Woche 1' })], WEEKS)
-    expect(bands.map((band) => band.label)).toEqual(['Woche 1'])
+    expect(bands.map((band) => band.label)).toEqual(['Woche 1', 'Woche 2'])
+    expect(bands[1]!.issues).toEqual([])
   })
 
   it('collects issues without a week in their own band at the end', () => {
     const bands = bandsOf([issue({ key: 'a', week: null }), issue({ key: 'b' })], WEEKS)
-    expect(bands.map((band) => band.label)).toEqual(['Woche 1', 'ohne Woche'])
+    expect(bands.map((band) => band.label)).toEqual(['Woche 1', 'Woche 2', 'ohne Woche'])
   })
 
-  it('shows no band at all when there are no issues', () => {
-    expect(bandsOf([], WEEKS)).toEqual([])
+  it('adds no band without a week while every issue has one', () => {
+    expect(bandsOf([], WEEKS).map((band) => band.label)).toEqual(WEEKS)
   })
 
   it('never loses an issue between the bands', () => {
@@ -201,18 +202,32 @@ describe('Stories accordion', () => {
 
 describe('applyMoves', () => {
   it('shows an issue in the column it was dropped into', () => {
-    const moved = applyMoves([issue({ key: 'KI-1', lane: 'todo' })], { 'KI-1': 'done' })
+    const moved = applyMoves([issue({ key: 'KI-1', lane: 'todo' })], { 'KI-1': { lane: 'done' } })
     expect(moved[0]!.lane).toBe('done')
+  })
+
+  it('shows an issue in the week it was dropped into', () => {
+    const moved = applyMoves([issue({ key: 'KI-1', week: 'Woche 1' })], {
+      'KI-1': { week: 'Woche 2' },
+    })
+    expect(moved[0]!.week).toBe('Woche 2')
+  })
+
+  it('keeps the column when only the week was moved', () => {
+    const moved = applyMoves([issue({ key: 'KI-1', lane: 'doing' })], {
+      'KI-1': { week: 'Woche 2' },
+    })
+    expect(moved[0]!.lane).toBe('doing')
   })
 
   it('leaves every other issue untouched', () => {
     const rows = [issue({ key: 'KI-1' }), issue({ key: 'KI-2', lane: 'doing' })]
-    expect(applyMoves(rows, { 'KI-1': 'done' })[1]!.lane).toBe('doing')
+    expect(applyMoves(rows, { 'KI-1': { lane: 'done' } })[1]!.lane).toBe('doing')
   })
 
   it('ignores a move for an issue that is no longer on the board', () => {
     const rows = [issue({ key: 'KI-1', lane: 'todo' })]
-    expect(applyMoves(rows, { 'KI-9': 'done' })).toEqual(rows)
+    expect(applyMoves(rows, { 'KI-9': { lane: 'done' } })).toEqual(rows)
   })
 })
 
@@ -294,5 +309,123 @@ describe('Stories drag and drop', () => {
   it('stays a read-only board when no handler is given', () => {
     render(<Stories issues={[issue({ key: 'KI-1' })]} weeks={WEEKS} />)
     expect(screen.getByText('KI-1').closest('a')).toHaveAttribute('draggable', 'false')
+  })
+
+  describe('onto a week', () => {
+    const dragToWeek = (key: string, band: string) => {
+      const transfer = dataTransfer()
+      fireEvent.dragStart(screen.getByText(key).closest('a')!, { dataTransfer: transfer })
+      const target = screen.getByText(band).parentElement!
+      fireEvent.dragOver(target, { dataTransfer: transfer })
+      fireEvent.drop(target, { dataTransfer: transfer })
+    }
+
+    it('tells jira which week the card was dropped on', () => {
+      const onWeek = vi.fn().mockResolvedValue(undefined)
+      render(
+        <Stories
+          issues={[issue({ key: 'KI-1', week: 'Woche 1' })]}
+          weeks={WEEKS}
+          workdaysLeft={8}
+          onWeek={onWeek}
+        />,
+      )
+
+      dragToWeek('KI-1', 'Woche 2')
+
+      expect(onWeek).toHaveBeenCalledWith('KI-1', 'Woche 2')
+    })
+
+    it('takes the card out of the open week before jira has answered', () => {
+      let settle = () => {}
+      const onWeek = vi.fn().mockReturnValue(new Promise<void>((resolve) => (settle = resolve)))
+      render(
+        <Stories
+          issues={[issue({ key: 'KI-1', week: 'Woche 1' })]}
+          weeks={WEEKS}
+          workdaysLeft={8}
+          onWeek={onWeek}
+        />,
+      )
+
+      dragToWeek('KI-1', 'Woche 2')
+
+      expect(screen.queryByText('KI-1')).not.toBeInTheDocument()
+      expect(within(screen.getByText('Woche 2').parentElement!).getByText('1 Vorgänge')).toBeInTheDocument()
+      settle()
+    })
+
+    it('does not bother jira when the card lands on its own week', () => {
+      const onWeek = vi.fn().mockResolvedValue(undefined)
+      render(
+        <Stories
+          issues={[issue({ key: 'KI-1', week: 'Woche 1' })]}
+          weeks={WEEKS}
+          workdaysLeft={8}
+          onWeek={onWeek}
+        />,
+      )
+
+      dragToWeek('KI-1', 'Woche 1')
+
+      expect(onWeek).not.toHaveBeenCalled()
+    })
+
+    it('puts the card back into its week and says so when jira refuses', async () => {
+      const onWeek = vi.fn().mockRejectedValue(new Error('Jira 400 Bad Request'))
+      render(
+        <Stories
+          issues={[issue({ key: 'KI-1', week: 'Woche 1' })]}
+          weeks={WEEKS}
+          workdaysLeft={8}
+          onWeek={onWeek}
+        />,
+      )
+
+      dragToWeek('KI-1', 'Woche 2')
+
+      await waitFor(() => expect(screen.getByText('KI-1')).toBeInTheDocument())
+      expect(screen.getByTitle('Jira 400 Bad Request')).toBeInTheDocument()
+    })
+
+    it('moves a card into a week that is empty, which has no cards to drop between', () => {
+      const onWeek = vi.fn().mockResolvedValue(undefined)
+      render(
+        <Stories
+          issues={[issue({ key: 'KI-1', week: 'Woche 1' })]}
+          weeks={WEEKS}
+          workdaysLeft={8}
+          onWeek={onWeek}
+        />,
+      )
+
+      expect(screen.getByText('Woche 2')).toBeInTheDocument()
+      dragToWeek('KI-1', 'Woche 2')
+      expect(onWeek).toHaveBeenCalledWith('KI-1', 'Woche 2')
+    })
+
+    it('takes the week away when the card is dropped on the band without one', () => {
+      const onWeek = vi.fn().mockResolvedValue(undefined)
+      render(
+        <Stories
+          issues={[issue({ key: 'KI-1', week: 'Woche 1' }), issue({ key: 'KI-9', week: null })]}
+          weeks={WEEKS}
+          workdaysLeft={8}
+          onWeek={onWeek}
+        />,
+      )
+
+      dragToWeek('KI-1', 'ohne Woche')
+
+      expect(onWeek).toHaveBeenCalledWith('KI-1', null)
+    })
+
+    it('ignores a drop on a week when the board is read-only', () => {
+      render(<Stories issues={[issue({ key: 'KI-1', week: 'Woche 1' })]} weeks={WEEKS} />)
+      const transfer = dataTransfer()
+      fireEvent.dragStart(screen.getByText('KI-1').closest('a')!, { dataTransfer: transfer })
+      fireEvent.drop(screen.getByText('Woche 2').parentElement!, { dataTransfer: transfer })
+      expect(screen.getByText('KI-1')).toBeInTheDocument()
+    })
   })
 })
