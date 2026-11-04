@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { IssueRow } from '../../shared/types.js'
-import { applyMoves, bandsOf, bandWeight, Stories } from './Stories.js'
+import { applyMoves, bandsOf, openBand, Stories } from './Stories.js'
 
 const issue = (over: Partial<IssueRow> = {}): IssueRow => ({
   key: 'KI-1',
@@ -53,33 +53,28 @@ describe('bandsOf', () => {
   })
 })
 
-describe('bandWeight', () => {
-  it('measures the tallest column, not the total count', () => {
-    const band = {
-      label: 'Woche 1',
-      issues: [
-        issue({ key: 'a', lane: 'todo' }),
-        issue({ key: 'b', lane: 'doing' }),
-        issue({ key: 'c', lane: 'done' }),
-      ],
-    }
-    expect(bandWeight(band)).toBe(1)
+describe('openBand', () => {
+  const bands = bandsOf([issue({ key: 'a' }), issue({ key: 'b', week: 'Woche 2' })], WEEKS)
+
+  it('opens the first week while more than a week of the sprint is left', () => {
+    expect(openBand(bands, WEEKS, 6)).toBe('Woche 1')
   })
 
-  it('grows with the fullest lane', () => {
-    const band = {
-      label: 'Woche 1',
-      issues: [
-        issue({ key: 'a', lane: 'todo' }),
-        issue({ key: 'b', lane: 'todo' }),
-        issue({ key: 'c', lane: 'done' }),
-      ],
-    }
-    expect(bandWeight(band)).toBe(2)
+  it('opens the second week once a week or less is left', () => {
+    expect(openBand(bands, WEEKS, 5)).toBe('Woche 2')
   })
 
-  it('never collapses a band to zero height', () => {
-    expect(bandWeight({ label: 'leer', issues: [] })).toBe(1)
+  it('opens the first week when the sprint says nothing about its length', () => {
+    expect(openBand(bands, WEEKS, null)).toBe('Woche 1')
+  })
+
+  it('falls back to the first band when the wanted week holds nothing', () => {
+    const only = bandsOf([issue({ key: 'a', week: 'Woche 1' })], WEEKS)
+    expect(openBand(only, WEEKS, 1)).toBe('Woche 1')
+  })
+
+  it('opens nothing when the board is empty', () => {
+    expect(openBand([], WEEKS, 3)).toBeNull()
   })
 })
 
@@ -146,6 +141,61 @@ describe('Stories', () => {
     render(<Stories issues={[issue({ avatar: null })]} weeks={WEEKS} />)
     expect(screen.queryByRole('img', { name: 'J. Beck' })).not.toBeInTheDocument()
     expect(screen.getByText('JB')).toBeInTheDocument()
+  })
+})
+
+describe('Stories accordion', () => {
+  const both = [
+    issue({ key: 'KI-1', week: 'Woche 1' }),
+    issue({ key: 'KI-2', week: 'Woche 2' }),
+  ]
+
+  it('shows the cards of one week only, so they fit the panel', () => {
+    render(<Stories issues={both} weeks={WEEKS} workdaysLeft={8} />)
+    expect(screen.getByText('KI-1')).toBeInTheDocument()
+    expect(screen.queryByText('KI-2')).not.toBeInTheDocument()
+  })
+
+  it('opens the week the sprint is actually in', () => {
+    render(<Stories issues={both} weeks={WEEKS} workdaysLeft={3} />)
+    expect(screen.queryByText('KI-1')).not.toBeInTheDocument()
+    expect(screen.getByText('KI-2')).toBeInTheDocument()
+  })
+
+  it('swaps the open week when the other chip is clicked', () => {
+    render(<Stories issues={both} weeks={WEEKS} workdaysLeft={8} />)
+
+    fireEvent.click(screen.getByText('Woche 2'))
+
+    expect(screen.getByText('KI-2')).toBeInTheDocument()
+    expect(screen.queryByText('KI-1')).not.toBeInTheDocument()
+    expect(screen.getByText('Woche 1')).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('closes the open week when its own chip is clicked', () => {
+    render(<Stories issues={both} weeks={WEEKS} workdaysLeft={8} />)
+
+    fireEvent.click(screen.getByText('Woche 1'))
+
+    expect(screen.queryByText('KI-1')).not.toBeInTheDocument()
+    expect(screen.queryByText('KI-2')).not.toBeInTheDocument()
+  })
+
+  it('says how many issues a closed week hides', () => {
+    render(
+      <Stories
+        issues={[...both, issue({ key: 'KI-3', week: 'Woche 2' })]}
+        weeks={WEEKS}
+        workdaysLeft={8}
+      />,
+    )
+    expect(screen.getByText('2 Vorgänge')).toBeInTheDocument()
+  })
+
+  it('keeps counting the points of a closed week in its chip row', () => {
+    render(<Stories issues={both} weeks={WEEKS} workdaysLeft={8} />)
+    const row = screen.getByText('Woche 2').parentElement!
+    expect(within(row).getByText('3 P')).toBeInTheDocument()
   })
 })
 

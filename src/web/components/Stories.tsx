@@ -34,11 +34,16 @@ export function bandsOf(issues: readonly IssueRow[], weeks: readonly string[]): 
   return bands.filter((band) => band.issues.length > 0)
 }
 
-export function bandWeight(band: Band): number {
-  const perLane = LANES.map(
-    (lane) => band.issues.filter((issue) => issue.lane === lane.key).length,
-  )
-  return Math.max(1, ...perLane)
+const WEEK_WORKDAYS = 5
+
+export function openBand(
+  bands: readonly Band[],
+  weeks: readonly string[],
+  workdaysLeft: number | null,
+): string | null {
+  const wanted = workdaysLeft != null && workdaysLeft <= WEEK_WORKDAYS ? weeks[1] : weeks[0]
+  const band = bands.find((candidate) => candidate.label === wanted) ?? bands[0]
+  return band?.label ?? null
 }
 
 function Card({
@@ -109,20 +114,24 @@ function Card({
 export function Stories({
   issues,
   weeks,
+  workdaysLeft = null,
   onMove,
 }: {
   issues: IssueRow[]
   weeks: string[]
+  workdaysLeft?: number | null
   onMove?: (key: string, lane: Lane) => Promise<unknown>
 }) {
   const [moves, setMoves] = useState<Moves>({})
   const [dragging, setDragging] = useState<string | null>(null)
   const [over, setOver] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [picked, setPicked] = useState<string | null>()
 
   const shown = applyMoves(issues, moves)
   const points = shown.reduce((total, issue) => total + (issue.points ?? 0), 0)
   const bands = bandsOf(shown, weeks)
+  const open = picked === undefined ? openBand(bands, weeks, workdaysLeft) : picked
 
   const forget = (key: string) =>
     setMoves((previous) => {
@@ -179,70 +188,93 @@ export function Stories({
       <div
         className="grid min-h-0 gap-2.5 overflow-hidden"
         style={{
-          gridTemplateRows: bands.map((band) => `minmax(0, ${bandWeight(band)}fr)`).join(' '),
+          gridTemplateRows: bands
+            .map((band) => (band.label === open ? 'minmax(0, 1fr)' : 'auto'))
+            .join(' '),
         }}
       >
-        {bands.map((band) => (
-          <div key={band.label} className="grid min-h-0 grid-rows-[auto_1fr]">
-            <div className="mb-1.5 flex items-center gap-2">
-              <span className="rounded bg-card px-1.5 py-0.5 text-[10px] tracking-wider text-ink-2 uppercase">
-                {band.label}
-              </span>
-              <span className="num text-[10px] text-muted">
-                {band.issues.reduce((total, issue) => total + (issue.points ?? 0), 0)} P
-              </span>
-              <span className="h-px flex-1 bg-rule" />
+        {bands.map((band) => {
+          const expanded = band.label === open
+          return (
+            <div
+              key={band.label}
+              className={`grid min-h-0 ${expanded ? 'grid-rows-[auto_1fr]' : 'grid-rows-[auto]'}`}
+            >
+              <div className="mb-1.5 flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-expanded={expanded}
+                  title={`${band.label} ${expanded ? 'einklappen' : 'ausklappen'}`}
+                  onClick={() => setPicked(expanded ? null : band.label)}
+                  className={`rounded px-1.5 py-0.5 text-[10px] tracking-wider uppercase ${
+                    expanded ? 'bg-accent/20 text-ink' : 'bg-card text-ink-2 hover:text-ink'
+                  }`}
+                >
+                  {band.label}
+                </button>
+                <span className="num text-[10px] text-muted">
+                  {band.issues.reduce((total, issue) => total + (issue.points ?? 0), 0)} P
+                </span>
+                {expanded ? null : (
+                  <span className="num text-[10px] text-muted">{band.issues.length} Vorgänge</span>
+                )}
+                <span className="h-px flex-1 bg-rule" />
+              </div>
+              {expanded ? (
+                <div className="grid min-h-0 grid-cols-3 gap-2.5">
+                  {LANES.map((lane) => {
+                    const zone = `${band.label}:${lane.key}`
+                    return (
+                      <ul
+                        key={lane.key}
+                        role="list"
+                        aria-label={`${lane.label} · ${band.label}`}
+                        onDragOver={(event) => {
+                          if (!onMove || !dragging) return
+                          event.preventDefault()
+                          if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+                          setOver(zone)
+                        }}
+                        onDragLeave={() =>
+                          setOver((current) => (current === zone ? null : current))
+                        }
+                        onDrop={(event) => {
+                          event.preventDefault()
+                          const key = event.dataTransfer?.getData('text/plain') || dragging
+                          if (key) drop(lane.key, key)
+                        }}
+                        className={`grid content-start gap-1.5 overflow-hidden rounded-lg border border-dashed ${
+                          over === zone
+                            ? 'border-accent bg-accent/5'
+                            : dragging
+                              ? 'border-rule'
+                              : 'border-transparent'
+                        } ${onMove ? 'min-h-8' : ''}`}
+                      >
+                        {band.issues
+                          .filter((issue) => issue.lane === lane.key)
+                          .map((issue) => (
+                            <li key={issue.key}>
+                              <Card
+                                issue={issue}
+                                draggable={Boolean(onMove)}
+                                busy={issue.key in moves}
+                                onDragStart={() => setDragging(issue.key)}
+                                onDragEnd={() => {
+                                  setDragging(null)
+                                  setOver(null)
+                                }}
+                              />
+                            </li>
+                          ))}
+                      </ul>
+                    )
+                  })}
+                </div>
+              ) : null}
             </div>
-            <div className="grid min-h-0 grid-cols-3 gap-2.5">
-              {LANES.map((lane) => {
-                const zone = `${band.label}:${lane.key}`
-                return (
-                  <ul
-                    key={lane.key}
-                    role="list"
-                    aria-label={`${lane.label} · ${band.label}`}
-                    onDragOver={(event) => {
-                      if (!onMove || !dragging) return
-                      event.preventDefault()
-                      if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
-                      setOver(zone)
-                    }}
-                    onDragLeave={() => setOver((current) => (current === zone ? null : current))}
-                    onDrop={(event) => {
-                      event.preventDefault()
-                      const key = event.dataTransfer?.getData('text/plain') || dragging
-                      if (key) drop(lane.key, key)
-                    }}
-                    className={`grid content-start gap-1.5 overflow-hidden rounded-lg border border-dashed ${
-                      over === zone
-                        ? 'border-accent bg-accent/5'
-                        : dragging
-                          ? 'border-rule'
-                          : 'border-transparent'
-                    } ${onMove ? 'min-h-8' : ''}`}
-                  >
-                    {band.issues
-                      .filter((issue) => issue.lane === lane.key)
-                      .map((issue) => (
-                        <li key={issue.key}>
-                          <Card
-                            issue={issue}
-                            draggable={Boolean(onMove)}
-                            busy={issue.key in moves}
-                            onDragStart={() => setDragging(issue.key)}
-                            onDragEnd={() => {
-                              setDragging(null)
-                              setOver(null)
-                            }}
-                          />
-                        </li>
-                      ))}
-                  </ul>
-                )
-              })}
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </section>
   )

@@ -154,6 +154,7 @@ export function App() {
             <Stories
               issues={sprint.value?.data.issues ?? []}
               weeks={board.value?.weekComponents ?? []}
+              workdaysLeft={sprint.value?.data.sprint.workdaysLeft ?? null}
               onMove={onMove}
             />
           )}
