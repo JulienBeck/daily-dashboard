@@ -153,6 +153,14 @@ describe('People', () => {
     expect(screen.getByText('JB')).toBeInTheDocument()
   })
 
+  it('scrolls the team list in the season colours, not the browser grey', () => {
+    render0([member()])
+    const list = screen.getByRole('list')
+
+    expect(list.className).toContain('scroller')
+    expect(list.className).not.toContain('overflow-y-auto')
+  })
+
   it('dims the picture of an absent member, as it dims the initials', () => {
     render0([member({ avatar: '/api/avatar?url=x', away: 'Urlaub' })])
     expect(screen.getByRole('img', { name: 'J. Beck' }).className).toContain('opacity-45')

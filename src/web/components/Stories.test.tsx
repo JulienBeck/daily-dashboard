@@ -143,6 +143,27 @@ describe('Stories', () => {
     expect(screen.queryByRole('img', { name: 'J. Beck' })).not.toBeInTheDocument()
     expect(screen.getByText('JB')).toBeInTheDocument()
   })
+
+  /*
+   * A lane taller than the tile used to be cut off without a hint. jsdom lays
+   * nothing out, so the classes are the only lever - and they are the whole
+   * fix: the bar needs the capped row above it as much as the overflow itself.
+   */
+  it('lets a lane scroll instead of cutting its cards off', () => {
+    render(<Stories issues={[issue({ week: 'Woche 1' })]} weeks={WEEKS} />)
+    const lane = screen.getByRole('list', { name: 'To Do · Woche 1' })
+
+    expect(lane.className).toContain('scroller')
+    expect(lane.className).toContain('min-h-0')
+    expect(lane.className).not.toContain('overflow-hidden')
+  })
+
+  it('caps the lane row, so the lane cannot just grow taller', () => {
+    render(<Stories issues={[issue({ week: 'Woche 1' })]} weeks={WEEKS} />)
+    const lanes = screen.getByRole('list', { name: 'To Do · Woche 1' }).parentElement!
+
+    expect(lanes.className).toContain('grid-rows-[minmax(0,1fr)]')
+  })
 })
 
 describe('Stories accordion', () => {

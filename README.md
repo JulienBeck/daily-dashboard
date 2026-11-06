@@ -224,6 +224,7 @@ Merge-Request-Läufe und externe Läufe bleiben außen vor — die gehören nich
 > Benutzernamen zeigt nur, was der fragende Token sehen darf, und das schließt fremde
 > Beiträge in privaten Projekten aus. Wem der Token gehört, sagt der Proxy selbst — siehe
 > „Wenn unter einem Namen nichts steht".
+
 | `jira.epicsBoardId` | Board-Nummer aus `…/RapidBoard.jspa?rapidView=<Zahl>`. Der Proxy liest den **Filter des Boards** und baut daraus die Abfrage — so gilt derselbe Bereich wie im Board |
 | `jira.epicsStatusCategories` | welche Epics gezeigt werden; Vorgabe `["indeterminate"]` = **In Progress**, also das laufende Theme |
 | `jira.epicsJql` | gesetzt überschreibt es Board und Status komplett. **Die tatsächlich gesendete Abfrage steht im Board** hinter dem Abzeichen `JQL` neben der Überschrift — darüberfahren genügt |
@@ -309,9 +310,8 @@ merkt sich `localStorage` unter `people-open`, und zwar nur als Abweichung: ein 
 nicht steht, ist offen. Zugeklappt als Vorgabe war ein Fehlgriff — der einzige Hinweis darauf,
 dass etwas da ist, war ein Zähler in 10 px, und damit sah ein voller Tag aus wie ein leerer.
 
-Läuft die Liste über die Kachelhöhe hinaus, scrollt sie. Das Board soll sonst ohne Scrollen
-auskommen; hier ist eine Leiste das kleinere Übel, denn vorher wurde der Überhang wortlos
-abgeschnitten.
+Läuft die Liste über die Kachelhöhe hinaus, scrollt sie — siehe „Was scrollt und wie die Leiste
+aussieht".
 
 Das Fenster hat zwei Untergrenzen, es gilt die **frühere** von beiden:
 
@@ -413,6 +413,30 @@ deshalb auf dem, was Jira zuerst nennt. Tauchen die falschen Status auf: Namen e
 Gibt es gar keinen passenden Übergang — fehlende Rechte oder ein Workflow, der den Sprung nicht
 erlaubt — nennt die Fehlermeldung die Status, die der Vorgang stattdessen anbietet. Der Token
 braucht dafür Schreibrechte; ein reiner Lesezugriff ergibt `403`.
+
+## Was scrollt und wie die Leiste aussieht
+
+Das Board kommt **als Ganzes** ohne Scrollen aus (`body { overflow: hidden }`). Innerhalb einer
+Kachel ist eine Leiste aber das kleinere Übel: vorher wurde der Überhang wortlos abgeschnitten, und
+genau das ist auf einem Wandbildschirm nicht zu bemerken.
+
+| Stelle | Wann sie scrollt |
+|---|---|
+| Team-Kachel, die Namensliste | mehr Namen und Commits, als in die Kachel passen |
+| Stories, jede der drei Spalten der **offenen** Woche | mehr Karten in dieser Spalte, als in das Band passen |
+| Merge Requests | **gar nicht** — dort steht weiterhin `overflow-hidden` |
+
+Die zugeklappten Wochen sind nur Kopfzeilen, da gibt es nichts zu scrollen. Dass die offene Woche
+überhaupt scrollen *kann*, hängt an einer Kette von Höhenbegrenzungen: `min-h-0` auf jedem
+Grid-Element darüber und `grid-rows-[minmax(0,1fr)]` auf der Spaltenreihe. Fehlt ein Glied, wächst
+die Liste einfach weiter und die Leiste erscheint nie — die Tests in `Stories.test.tsx` halten
+beides fest, weil jsdom nichts umbricht und der Fehler sonst erst auf dem Board auffällt.
+
+Die Leiste selbst ist die Utility `scroller` in `src/web/index.css`: 8 px schmal, Griff in `--rule`,
+Spur unsichtbar, unter dem Zeiger der Jahreszeitenakzent. **Im Ruhezustand bewusst kein Akzent** —
+der Akzent trägt auf diesem Board Bedeutung (Kartenrand, Kachelkante), und bis zu vier farbige
+Leisten gleichzeitig würden mit ihm um Aufmerksamkeit streiten. Angefasst wird am Wandbildschirm
+ohnehin nichts.
 
 ## Jahreszeiten
 

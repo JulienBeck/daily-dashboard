@@ -113,6 +113,33 @@ body::before {
   font-variant-numeric: tabular-nums;
 }
 
+/* The default bar is a light grey slab that outshines the cards next to it. The
+   thumb rests in the rule colour and only takes the season accent under the
+   pointer - on the wall screen nobody hovers, so the resting state is the one
+   that counts. Needs min-h-0 up the grid chain, or the list just grows instead. */
+@utility scroller {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--rule);
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: var(--accent);
+  }
+}
+
 @keyframes dash-pulse {
   0%,
   100% {

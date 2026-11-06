@@ -121,7 +121,7 @@ export function People({
         ))}
       </div>
 
-      <ul className="grid content-start gap-3 overflow-y-auto text-[13px]" role="list">
+      <ul className="scroller grid min-h-0 content-start gap-3 text-[13px]" role="list">
         {team.map((member) => {
           const away = awayOf(member, calendar)
           const soon = away ? null : nextAwayOf(member.nextAway)

@@ -269,7 +269,7 @@ export function Stories({
                 <span className="h-px flex-1 bg-rule" />
               </div>
               {expanded ? (
-                <div className="grid min-h-0 grid-cols-3 gap-2.5">
+                <div className="grid min-h-0 grid-cols-3 grid-rows-[minmax(0,1fr)] gap-2.5">
                   {LANES.map((lane) => {
                     const zone = `${band.label}:${lane.key}`
                     return (
@@ -291,7 +291,7 @@ export function Stories({
                           const key = event.dataTransfer?.getData('text/plain') || dragging
                           if (key) drop(lane.key, key)
                         }}
-                        className={`grid content-start gap-1.5 overflow-hidden rounded-lg border border-dashed ${
+                        className={`scroller grid min-h-0 content-start gap-1.5 rounded-lg border border-dashed ${
                           over === zone
                             ? 'border-accent bg-accent/5'
                             : dragging
