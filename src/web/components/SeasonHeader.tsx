@@ -1,5 +1,6 @@
 import type { Season } from '../../shared/season.js'
 import type { EpicRow } from '../../shared/types.js'
+import { IconWarning } from '../icons.js'
 import { SEASON_ART } from '../seasonArt.js'
 import { Epics } from './Epics.js'
 
@@ -8,6 +9,8 @@ interface Props {
   next: Season
   nextStart: Date
   daysLeft: number
+  reminder: boolean
+  onDismiss: () => void
   preview: boolean
   clock: Date
   epics: EpicRow[]
@@ -29,6 +32,8 @@ export function SeasonHeader({
   next,
   nextStart,
   daysLeft,
+  reminder,
+  onDismiss,
   preview,
   clock,
   epics,
@@ -60,8 +65,21 @@ export function SeasonHeader({
 
       <div className="flex items-center gap-2.5 text-right text-[11px] text-muted">
         <div className="leading-snug">
-          <div className="num">
-            noch {daysLeft} {daysLeft === 1 ? 'Arbeitstag' : 'Arbeitstage'}
+          <div className={`num flex items-center justify-end gap-1${reminder ? ' text-warning' : ''}`}>
+            {reminder ? (
+              <button
+                type="button"
+                onClick={onDismiss}
+                title={`Nächstes Theme planen: ${next.label} – klicken blendet die Warnung heute aus`}
+                aria-label="Nächstes Theme planen, heute ausblenden"
+                className="rounded p-0.5 text-[14px] leading-none hover:bg-white/10"
+              >
+                <IconWarning />
+              </button>
+            ) : null}
+            <span className={reminder ? 'font-semibold' : undefined}>
+              noch {daysLeft} {daysLeft === 1 ? 'Arbeitstag' : 'Arbeitstage'}
+            </span>
           </div>
           <div>ab {shortDate.format(nextStart)}</div>
         </div>

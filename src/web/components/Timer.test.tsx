@@ -198,4 +198,189 @@ describe('Timer', () => {
 
     expect(screen.getByRole('alert')).toBeInTheDocument()
   })
+
+  it('asks on load whether to start when told to', () => {
+    render(<Timer ask />)
+
+    expect(screen.getByRole('dialog', { name: 'Daily-Timer starten?' })).toBeInTheDocument()
+  })
+
+  it('does not ask unless told to', () => {
+    render(<Timer />)
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('starts the timebox when the prompt is confirmed', () => {
+    render(<Timer ask />)
+
+    press('Starten')
+    tick(2000)
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByText('14:58')).toBeInTheDocument()
+  })
+
+  it('leaves the timebox untouched when the prompt is declined', () => {
+    render(<Timer ask />)
+
+    press('Nicht jetzt')
+    tick(2000)
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByText('15:00')).toBeInTheDocument()
+  })
+
+  it('declines the prompt on escape', () => {
+    render(<Timer ask />)
+
+    act(() => void window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })))
+    tick(2000)
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByText('15:00')).toBeInTheDocument()
+  })
+
+  it('ignores the space bar while the prompt is open', () => {
+    render(<Timer ask />)
+
+    space()
+    tick(2000)
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByText('15:00')).toBeInTheDocument()
+  })
+
+  it('focuses the start button so enter confirms', () => {
+    render(<Timer ask />)
+
+    expect(screen.getByRole('button', { name: 'Starten' })).toHaveFocus()
+  })
+
+  it('opens the dial when the time is clicked', () => {
+    render(<Timer />)
+
+    press('Timebox einstellen, 15:00')
+
+    expect(screen.getByRole('dialog', { name: 'Timebox einstellen' })).toBeInTheDocument()
+    expect(screen.getByRole('slider')).toHaveAttribute('aria-valuenow', '15')
+  })
+
+  it('runs the timebox chosen on the dial', () => {
+    render(<Timer />)
+
+    press('Timebox einstellen, 15:00')
+    act(() => void fireEvent.keyDown(screen.getByRole('slider'), { key: 'PageUp' }))
+    press('Übernehmen')
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByText('20:00')).toBeInTheDocument()
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuemax', '1200')
+
+    press('Start')
+    tick(3000)
+    expect(screen.getByText('19:57')).toBeInTheDocument()
+  })
+
+  it('goes back to the chosen timebox after it ran out', () => {
+    render(<Timer />)
+
+    press('Timebox einstellen, 15:00')
+    act(() => void fireEvent.keyDown(screen.getByRole('slider'), { key: 'End' }))
+    press('Übernehmen')
+    press('Start')
+    tick(1000 * 4000)
+    press('Zurücksetzen')
+
+    expect(screen.getByText('60:00')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Start' })).toBeInTheDocument()
+  })
+
+  it('starts a fresh timebox when a paused one is changed', () => {
+    render(<Timer />)
+
+    press('Start')
+    tick(5000)
+    press('Pause')
+    press('Timebox einstellen, 14:55')
+    act(() => void fireEvent.keyDown(screen.getByRole('slider'), { key: 'PageDown' }))
+    press('Übernehmen')
+
+    expect(screen.getByText('10:00')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Start' })).toBeInTheDocument()
+  })
+
+  it('keeps the timebox when the dial is cancelled', () => {
+    render(<Timer />)
+
+    press('Timebox einstellen, 15:00')
+    act(() => void fireEvent.keyDown(screen.getByRole('slider'), { key: 'End' }))
+    press('Abbrechen')
+
+    expect(screen.getByText('15:00')).toBeInTheDocument()
+  })
+
+  it('closes the dial on a click outside of it', () => {
+    render(<Timer />)
+
+    press('Timebox einstellen, 15:00')
+    act(() => void fireEvent.pointerDown(document.body))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('keeps the dial open on a click inside of it', () => {
+    render(<Timer />)
+
+    press('Timebox einstellen, 15:00')
+    act(() => void fireEvent.pointerDown(screen.getByRole('slider')))
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('closes the dial when the time is clicked again', () => {
+    render(<Timer />)
+
+    press('Timebox einstellen, 15:00')
+    press('Timebox einstellen, 15:00')
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('locks the time while the timebox runs', () => {
+    render(<Timer />)
+
+    press('Start')
+
+    expect(screen.getByRole('button', { name: 'Timebox einstellen, 15:00' })).toBeDisabled()
+  })
+
+  it('ignores the space bar while the dial is open', () => {
+    render(<Timer />)
+
+    press('Timebox einstellen, 15:00')
+    space()
+    tick(2000)
+
+    expect(screen.getByText('15:00')).toBeInTheDocument()
+  })
+
+  it('names the chosen timebox in the start prompt', () => {
+    render(<Timer ask />)
+
+    expect(screen.getByText('15:00 Timebox')).toBeInTheDocument()
+  })
+
+  it('fills the bar against the chosen timebox', () => {
+    render(<Timer />)
+    const bar = () => screen.getByRole('progressbar').firstElementChild as HTMLElement
+
+    press('Timebox einstellen, 15:00')
+    act(() => void fireEvent.keyDown(screen.getByRole('slider'), { key: 'PageUp' }))
+    press('Übernehmen')
+    press('Start')
+    tick(1000 * 600)
+
+    expect(bar().style.width).toBe('50%')
+  })
 })

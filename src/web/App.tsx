@@ -25,7 +25,6 @@ import { Ampel } from './components/Ampel.js'
 import { Burndown } from './components/Burndown.js'
 import { MergeRequests } from './components/MergeRequests.js'
 import { People } from './components/People.js'
-import { ReminderBand } from './components/ReminderBand.js'
 import { SeasonHeader } from './components/SeasonHeader.js'
 import { SprintTile } from './components/SprintTile.js'
 import { Stories } from './components/Stories.js'
@@ -122,6 +121,8 @@ export function App() {
         next={upcoming}
         nextStart={start}
         daysLeft={daysLeft}
+        reminder={showReminder}
+        onDismiss={onDismiss}
         preview={Boolean(forced)}
         clock={clock}
         epics={epics.value?.data.rows ?? []}
@@ -129,11 +130,7 @@ export function App() {
         epicsError={epics.error}
       />
 
-      {showReminder ? (
-        <ReminderBand next={upcoming} daysLeft={daysLeft} onDismiss={onDismiss} />
-      ) : null}
-
-      <Timer />
+      <Timer ask />
 
       <main
         className="grid min-h-0 flex-1 gap-3"

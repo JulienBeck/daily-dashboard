@@ -1,5 +1,5 @@
 import type { ReactElement, SVGProps } from 'react'
-import type { AmpelState, SeasonKey } from '../shared/types.js'
+import type { AmpelState } from '../shared/types.js'
 
 type IconProps = SVGProps<SVGSVGElement> & { title?: string }
 
@@ -25,55 +25,6 @@ const stroke = {
   strokeLinecap: 'round',
   strokeLinejoin: 'round',
 } as const
-
-export const MapleLeaf = (props: IconProps) => (
-  <Svg {...props}>
-    <path
-      fill="currentColor"
-      d="M12 23v-4.4l2.3.7-.6-2.7 4.2 1.6-.7-1.9 4.6-3.4-1.5-.6 1.1-3-3 .8-.4-1.2-2.4 2.5 1-5.5-2.2 1.2L12 2 9.6 7.1 7.4 5.9l1 5.5L6 8.9l-.4 1.2-3-.8 1.1 3-1.5.6 4.6 3.4-.7 1.9 4.2-1.6-.6 2.7 2.3-.7Z"
-    />
-  </Svg>
-)
-
-export const Sun = (props: IconProps) => (
-  <Svg {...props}>
-    <circle cx="12" cy="12" r="4.4" fill="currentColor" />
-    <g {...stroke}>
-      <path d="M12 2.2v2.4M12 19.4v2.4M2.2 12h2.4M19.4 12h2.4M5.1 5.1l1.7 1.7M17.2 17.2l1.7 1.7M18.9 5.1l-1.7 1.7M6.8 17.2l-1.7 1.7" />
-    </g>
-  </Svg>
-)
-
-export const Blossom = (props: IconProps) => (
-  <Svg {...props}>
-    <g fill="currentColor">
-      <ellipse cx="12" cy="7.8" rx="2.6" ry="3.6" />
-      <ellipse cx="15.99" cy="10.7" rx="2.6" ry="3.6" transform="rotate(72 15.99 10.7)" />
-      <ellipse cx="14.47" cy="15.4" rx="2.6" ry="3.6" transform="rotate(144 14.47 15.4)" />
-      <ellipse cx="9.53" cy="15.4" rx="2.6" ry="3.6" transform="rotate(216 9.53 15.4)" />
-      <ellipse cx="8.01" cy="10.7" rx="2.6" ry="3.6" transform="rotate(288 8.01 10.7)" />
-    </g>
-    <circle cx="12" cy="12" r="2.2" fill="var(--surface, #1a1a19)" />
-  </Svg>
-)
-
-export const Snowflake = (props: IconProps) => (
-  <Svg {...props}>
-    <g {...stroke}>
-      <path d="M12 2.2V21.8M3.51 7.1 20.49 16.9M20.49 7.1 3.51 16.9" />
-      <path d="M10.39 4.11 12 6.4l1.61-2.29M10.39 19.89 12 17.6l1.61 2.29" />
-      <path d="M18.03 6.66 16.85 9.2l2.79.24M5.97 17.34 7.15 14.8l-2.79-.24" />
-      <path d="M4.36 9.44 7.15 9.2 5.97 6.66M19.64 14.56 16.85 14.8l1.18 2.54" />
-    </g>
-  </Svg>
-)
-
-export const SEASON_ICON: Record<SeasonKey, (props: IconProps) => ReactElement> = {
-  spring: Blossom,
-  summer: Sun,
-  autumn: MapleLeaf,
-  winter: Snowflake,
-}
 
 export const StatusGood = (props: IconProps) => (
   <Svg data-icon="good" {...props}>
@@ -180,15 +131,6 @@ export const IconTimer = (props: IconProps) => (
   </Svg>
 )
 
-export const IconBell = (props: IconProps) => (
-  <Svg {...props}>
-    <g {...stroke}>
-      <path d="M18 16.4V11a6 6 0 1 0-12 0v5.4L4.4 18.6h15.2Z" />
-      <path d="M10 21h4" />
-    </g>
-  </Svg>
-)
-
 export const IconFlag = (props: IconProps) => (
   <Svg {...props}>
     <path d="M6 21V4.2h11.6l-2.2 4 2.2 4H6" {...stroke} />
@@ -223,6 +165,15 @@ export const IconRefresh = (props: IconProps) => (
       <path d="M19.73 7.3 19.24 10.06 17.44 7.92" />
       <path d="M19.24 13.94a7.5 7.5 0 0 1-14.48 0" />
       <path d="M4.27 16.7 4.76 13.94 6.56 16.08" />
+    </g>
+  </Svg>
+)
+
+export const IconWarning = (props: IconProps) => (
+  <Svg {...props}>
+    <g {...stroke}>
+      <path d="M10.3 4.1 2.6 17.6A2 2 0 0 0 4.3 20.6h15.4a2 2 0 0 0 1.7-3L13.7 4.1a2 2 0 0 0-3.4 0Z" />
+      <path d="M12 9.4v4.4M12 17.2h.01" />
     </g>
   </Svg>
 )
