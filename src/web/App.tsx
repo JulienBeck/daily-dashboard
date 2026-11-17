@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import type { IssueRow } from '../shared/types.js'
 import {
   nextSeason,
@@ -32,6 +32,8 @@ import { Stories } from './components/Stories.js'
 import { Timer } from './components/Timer.js'
 import { IconStale } from './icons.js'
 
+const QuestlogOverlay = lazy(() => import('./questlog/QuestlogOverlay.js'))
+
 const dismissKey = (iso: string) => `theme-reminder-dismissed-${iso}`
 
 function Problem({ what, message }: { what: string; message: string }) {
@@ -49,6 +51,7 @@ export function App() {
   const [clock, setClock] = useState(() => new Date())
   const [dismissed, setDismissed] = useState(false)
   const [look, toggleLook] = useLook()
+  const [questKey, setQuestKey] = useState<string | null>(null)
   const [mrsCollapsed, setMrsCollapsed] = useState(
     () => localStorage.getItem('mrs-collapsed') === 'true',
   )
@@ -111,6 +114,11 @@ export function App() {
     [reloadSprint],
   )
 
+  const closeQuestlog = useCallback(() => {
+    setQuestKey(null)
+    void reloadSprint()
+  }, [reloadSprint])
+
   const onDismiss = () => {
     localStorage.setItem(dismissKey(start.toISOString()), todayStamp(clock))
     setDismissed(true)
@@ -167,6 +175,7 @@ export function App() {
               workdaysLeft={sprint.value?.data.sprint.workdaysLeft ?? null}
               onMove={onMove}
               onWeek={onWeek}
+              onOpen={setQuestKey}
             />
           )}
         </div>
@@ -191,6 +200,12 @@ export function App() {
           onRefresh={pipelines.reload}
         />
       )}
+
+      {questKey ? (
+        <Suspense fallback={null}>
+          <QuestlogOverlay issueKey={questKey} onClose={closeQuestlog} />
+        </Suspense>
+      ) : null}
     </div>
   )
 }

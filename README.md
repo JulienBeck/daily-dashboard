@@ -30,6 +30,7 @@ Browser (SPA, kein Token)
    │  /api/board /api/pipelines /api/mrs /api/sprint /api/epics
    │  /api/commits /api/calendar /api/avatar /api/burndown
    │  POST /api/issues/<key>/lane
+   │  /api/questlog /api/questlog/pages/<id> (+ POST quests, accept, complete)
    ▼
 Fastify-Proxy (GITLAB_TOKEN, JIRA_TOKEN)
    ├─► GitLab GraphQL  /api/graphql
@@ -413,6 +414,67 @@ deshalb auf dem, was Jira zuerst nennt. Tauchen die falschen Status auf: Namen e
 Gibt es gar keinen passenden Übergang — fehlende Rechte oder ein Workflow, der den Sprung nicht
 erlaubt — nennt die Fehlermeldung die Status, die der Vorgang stattdessen anbietet. Der Token
 braucht dafür Schreibrechte; ein reiner Lesezugriff ergibt `403`.
+
+## Questlog
+
+Ein Klick auf eine Story-Karte öffnet das **Questlog** als Overlay über dem Board, die
+angeklickte Story ist darin ausgewählt. Mit Strg, Cmd oder Shift geklickt öffnet die Karte wie
+früher Jira. Ziehen bleibt Ziehen und verschiebt die Karte (siehe „Stories verschieben").
+Schließen: das rote × oben rechts, `Esc` oder ein Klick neben das Fenster.
+
+Das Questlog war vorher eine eigene Anwendung und liegt jetzt vollständig hier:
+
+| Teil | Pfad |
+|---|---|
+| Oberfläche | `src/web/questlog/` — lädt erst beim ersten Öffnen, das Board selbst bleibt so schlank wie vorher |
+| Proxy | `src/server/questlog/`, Routen unter `/api/questlog` in `src/server/index.ts` |
+| Logik ohne IO | `src/shared/questlog/` — Stufe, Schwierigkeit, Belohnung |
+| Grafiken und Schriften | `src/web/assets/questlog/` — **Kopien** aus dem Questlog-Repository (`design/`). Neu erzeugt werden sie dort mit `textures.py` bzw. `assets.py` und dann hierher kopiert |
+
+Das Stylesheet `src/web/questlog/questlog.css` ist auf `.ql` begrenzt, damit nichts davon auf das
+Board durchschlägt. Tailwind scannt das Verzeichnis bewusst nicht (`@source not` in
+`src/web/index.css`): Klassennamen wie `collapse` sind dort Utilities und würden die Knöpfe des
+Buchs unsichtbar machen.
+
+Gesucht wird die Story der Reihe nach auf den konfigurierten Buchseiten. Steht sie auf keiner,
+öffnet das Buch auf der letzten Seite mit deren erster Quest.
+
+Was im Buch geändert wird — annehmen, abgeben, neu anlegen —, sieht das Board beim Schließen
+sofort; umgekehrt vergisst der Proxy die Buchseiten, sobald eine Karte verschoben wurde.
+
+### Konfiguration
+
+Ein eigener Abschnitt `questlog` in derselben Datei. Jira-Adresse, `flavor`,
+`storyPointsField` und die Statuskategorien **erbt** er aus `jira`, jedes davon lässt sich unter
+`questlog.jira` einzeln überschreiben.
+
+```json
+{
+  "questlog": {
+    "pages": [
+      { "id": "ki", "title": "KI", "boardId": 253,
+        "create": { "project": "PRO", "issueType": "Task", "labels": ["questlog"] } },
+      { "id": "sidequests", "title": "Sidequests",
+        "jql": "labels = sidequest AND resolution = Unresolved ORDER BY rank" }
+    ],
+    "refreshSeconds": 120
+  }
+}
+```
+
+| Schlüssel | Wirkung |
+|---|---|
+| `questlog.pages[]` | je Buchseite ein Eintrag mit `id`, `title`, `boardId` **oder** `jql` (gesetzt schlägt `jql`) und optional `create`. Ohne `create` ist die Seite nur lesend |
+| `questlog.pages[].create` | `project`, `issueType` und `labels` für selbst vergebene Quests |
+| `questlog.jira.maxQuests` | wie viele Vorgänge je Seite geholt werden, Vorgabe 100 |
+| `questlog.jira.epicLinkField` / `epicNameField` | nur nötig, wenn die Felder in der Instanz umbenannt wurden |
+| `questlog.refreshSeconds` | wie oft das offene Buch nachlädt, Vorgabe 120 |
+| `questlog.cacheSeconds.jira` | wie lange der Proxy eine Buchseite festhält, Vorgabe wie `cacheSeconds.jira` |
+
+**Das Buch schreibt nach Jira.** Annehmen weist zu und ändert den Status, „Quest erstellen“
+legt Vorgänge an. Der `JIRA_TOKEN` braucht dafür **Create Issues** in jedem Projekt aus
+`questlog.pages[].create`, und das Board gehört hinter eine Anmeldung — wer die Adresse kennt,
+vergibt sonst Quests im Namen des Token-Besitzers.
 
 ## Was scrollt und wie die Leiste aussieht
 

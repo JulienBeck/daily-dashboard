@@ -46,6 +46,25 @@
     "perMember": 5,
     "sinceLastWorkday": true
   },
+  "questlog": {
+    "pages": [
+      {
+        "id": "ki",
+        "title": "KI",
+        "boardId": 0,
+        "jql": null,
+        "create": { "project": "EXA", "issueType": "Task", "labels": ["questlog"] }
+      },
+      {
+        "id": "sidequests",
+        "title": "Sidequests",
+        "boardId": null,
+        "jql": "labels = sidequest AND resolution = Unresolved ORDER BY rank",
+        "create": { "project": "EXA", "issueType": "Task", "labels": ["questlog", "sidequest"] }
+      }
+    ],
+    "refreshSeconds": 120
+  },
   "refreshSeconds": 60,
   "cacheSeconds": {
     "gitlab": 60,

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import type { TeamMember } from '../shared/types.js'
 import { parseAbsences, type Absence, type MemberAbsence } from './absence.js'
+import { parseConfig as parseQuestlog, type QuestlogConfig } from './questlog/config.js'
 
 export interface GitlabConfig {
   baseUrl: string
@@ -73,6 +74,7 @@ export interface DashboardConfig {
   activity: { hours: number; perMember: number; sinceLastWorkday: boolean }
   refreshSeconds: number
   cacheSeconds: { gitlab: number; jira: number; calendar: number }
+  questlog: QuestlogConfig
 }
 
 const initials = (name: string) =>
@@ -93,6 +95,7 @@ export function parseConfig(raw: unknown): DashboardConfig {
   const activity = source.activity ?? {}
   const calendar = source.calendar ?? {}
   const cache = source.cacheSeconds ?? {}
+  const questlog = source.questlog ?? {}
 
   return {
     gitlab: {
@@ -169,6 +172,11 @@ export function parseConfig(raw: unknown): DashboardConfig {
       jira: Number(cache.jira ?? 120),
       calendar: Number(cache.calendar ?? 300),
     },
+    questlog: parseQuestlog({
+      ...questlog,
+      jira: { ...jira, ...questlog.jira },
+      cacheSeconds: { jira: cache.jira, ...questlog.cacheSeconds },
+    }),
   }
 }
 

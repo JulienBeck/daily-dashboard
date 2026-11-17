@@ -251,4 +251,49 @@ describe('readConfigText', () => {
     })
     expect(text).toBe('read:./dashboard.config.json')
   })
+
+  it('takes the questlog pages from their own section', () => {
+    const config = parseConfig({
+      questlog: { pages: [{ id: 'ki', title: 'KI', boardId: 7 }], refreshSeconds: 90 },
+    })
+    expect(config.questlog.pages).toEqual([
+      { id: 'ki', title: 'KI', boardId: 7, jql: null, create: null },
+    ])
+    expect(config.questlog.refreshSeconds).toBe(90)
+  })
+
+  it('lets the questlog talk to the same jira as the board', () => {
+    const config = parseConfig({
+      jira: {
+        baseUrl: 'https://jira.example.com/',
+        flavor: 'cloud',
+        storyPointsField: 'customfield_10002',
+        doneStatusCategories: ['done', 'closed'],
+      },
+    })
+    expect(config.questlog.jira).toMatchObject({
+      baseUrl: 'https://jira.example.com',
+      flavor: 'cloud',
+      storyPointsField: 'customfield_10002',
+      doneStatusCategories: ['done', 'closed'],
+    })
+  })
+
+  it('lets the questlog override single jira fields', () => {
+    const config = parseConfig({
+      jira: { baseUrl: 'https://jira.example.com', storyPointsField: 'customfield_1' },
+      questlog: { jira: { storyPointsField: 'customfield_2', maxQuests: 50 } },
+    })
+    expect(config.questlog.jira.baseUrl).toBe('https://jira.example.com')
+    expect(config.questlog.jira.storyPointsField).toBe('customfield_2')
+    expect(config.questlog.jira.maxQuests).toBe(50)
+  })
+
+  it('caches questlog pages as long as the board caches jira, unless told otherwise', () => {
+    expect(parseConfig({ cacheSeconds: { jira: 45 } }).questlog.cacheSeconds.jira).toBe(45)
+    expect(
+      parseConfig({ cacheSeconds: { jira: 45 }, questlog: { cacheSeconds: { jira: 10 } } }).questlog
+        .cacheSeconds.jira,
+    ).toBe(10)
+  })
 })

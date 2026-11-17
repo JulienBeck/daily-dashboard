@@ -1,5 +1,7 @@
 @import 'tailwindcss';
-@import './questlog.css';
+@import './questlog-fonts.css';
+@import './look-questlog.css';
+@source not './questlog';
 
 :root {
   color-scheme: dark;

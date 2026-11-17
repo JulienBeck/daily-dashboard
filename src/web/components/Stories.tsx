@@ -63,12 +63,14 @@ function Card({
   busy,
   onDragStart,
   onDragEnd,
+  onOpen,
 }: {
   issue: IssueRow
   draggable: boolean
   busy: boolean
   onDragStart: () => void
   onDragEnd: () => void
+  onOpen?: (key: string) => void
 }) {
   const done = issue.lane === 'done'
   const accent = done ? 'var(--ink-muted)' : issue.flagged ? 'var(--critical)' : 'var(--accent)'
@@ -85,6 +87,11 @@ function Card({
         onDragStart()
       }}
       onDragEnd={onDragEnd}
+      onClick={(event) => {
+        if (!onOpen || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return
+        event.preventDefault()
+        onOpen(issue.key)
+      }}
       className={`block rounded-lg border border-white/10 border-l-2 bg-card px-2.5 py-1.5 no-underline ${
         done ? 'opacity-55' : ''
       } ${draggable ? 'cursor-grab active:cursor-grabbing' : ''} ${busy ? 'animate-pulse' : ''}`}
@@ -128,12 +135,14 @@ export function Stories({
   workdaysLeft = null,
   onMove,
   onWeek,
+  onOpen,
 }: {
   issues: IssueRow[]
   weeks: string[]
   workdaysLeft?: number | null
   onMove?: (key: string, lane: Lane) => Promise<unknown>
   onWeek?: (key: string, week: string | null) => Promise<unknown>
+  onOpen?: (key: string) => void
 }) {
   const [moves, setMoves] = useState<Moves>({})
   const [dragging, setDragging] = useState<string | null>(null)
@@ -312,6 +321,7 @@ export function Stories({
                                   setDragging(null)
                                   setOver(null)
                                 }}
+                                onOpen={onOpen}
                               />
                             </li>
                           ))}

@@ -450,3 +450,37 @@ describe('Stories drag and drop', () => {
     })
   })
 })
+
+describe('Stories opening the questlog', () => {
+  const board = (onOpen?: (key: string) => void) =>
+    render(<Stories issues={[issue({ key: 'KI-7' })]} weeks={WEEKS} onOpen={onOpen} />)
+
+  const card = () => screen.getByText('KI-7').closest('a') as HTMLAnchorElement
+
+  it('opens the questlog on a plain click instead of following the jira link', () => {
+    const onOpen = vi.fn()
+    board(onOpen)
+
+    const followed = fireEvent.click(card())
+
+    expect(onOpen).toHaveBeenCalledWith('KI-7')
+    expect(followed).toBe(false)
+  })
+
+  it('still lets a modified click go to jira', () => {
+    const onOpen = vi.fn()
+    board(onOpen)
+
+    expect(fireEvent.click(card(), { ctrlKey: true })).toBe(true)
+    expect(fireEvent.click(card(), { metaKey: true })).toBe(true)
+    expect(fireEvent.click(card(), { shiftKey: true })).toBe(true)
+    expect(onOpen).not.toHaveBeenCalled()
+  })
+
+  it('keeps the jira link as it was when nobody listens', () => {
+    board()
+
+    expect(card()).toHaveAttribute('href', 'https://jira.example.com/browse/KI-1')
+    expect(fireEvent.click(card())).toBe(true)
+  })
+})

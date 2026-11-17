@@ -17,6 +17,14 @@ import {
   moveIssue,
   setIssueWeek,
 } from './jira.js'
+import { pageById } from './questlog/config.js'
+import {
+  acceptQuest,
+  completeQuest,
+  createQuest,
+  fetchPage,
+  type NewQuest,
+} from './questlog/jira.js'
 
 const config = loadConfig()
 const cache = new StaleCache()
@@ -165,6 +173,7 @@ app.post<{ Params: { key: string }; Body: { lane?: string } }>(
     // The board polls the cached sprint; without this the card would snap back.
     cache.invalidate('sprint')
     cache.invalidate('burndown')
+    forgetQuestlogPages()
     return moved
   },
 )
@@ -185,6 +194,80 @@ app.post<{ Params: { key: string }; Body: { week?: unknown } }>(
     )
     cache.invalidate('sprint')
     return moved
+  },
+)
+
+const questlogPage = (id: string) => {
+  guard(Boolean(jiraCredentials.token), 'JIRA_TOKEN ist nicht gesetzt')
+  guard(Boolean(config.questlog.jira.baseUrl), 'Keine Jira-Adresse konfiguriert')
+  const page = pageById(config.questlog, id)
+  guard(page != null, `Unbekannte Questlog-Seite: ${id}`)
+  return page!
+}
+
+function forgetQuestlogPages() {
+  for (const page of config.questlog.pages) cache.invalidate(`questlog:${page.id}`)
+}
+
+function afterQuestWrite() {
+  forgetQuestlogPages()
+  cache.invalidate('sprint')
+  cache.invalidate('burndown')
+}
+
+app.get('/api/questlog', async () => ({
+  pages: config.questlog.pages.map((page) => ({
+    id: page.id,
+    title: page.title,
+    canCreate: page.create != null,
+  })),
+  refreshSeconds: config.questlog.refreshSeconds,
+  jiraBaseUrl: config.questlog.jira.baseUrl,
+}))
+
+app.get<{ Params: { id: string } }>('/api/questlog/pages/:id', async (request) => {
+  const page = questlogPage(request.params.id)
+  return cache.get(`questlog:${page.id}`, config.questlog.cacheSeconds.jira, () =>
+    fetchPage(config.questlog.jira, page, jiraCredentials, deps),
+  )
+})
+
+app.post<{ Params: { id: string }; Body: Partial<NewQuest> }>(
+  '/api/questlog/pages/:id/quests',
+  async (request, reply) => {
+    const page = questlogPage(request.params.id)
+    const created = await createQuest(
+      config.questlog.jira,
+      page,
+      jiraCredentials,
+      deps,
+      request.body ?? {},
+    )
+    afterQuestWrite()
+    reply.status(201)
+    return created
+  },
+)
+
+app.post<{ Params: { id: string; key: string } }>(
+  '/api/questlog/pages/:id/quests/:key/accept',
+  async (request) => {
+    questlogPage(request.params.id)
+    guard(isIssueKey(request.params.key), 'Kein gültiger Jira-Schlüssel')
+    const taken = await acceptQuest(config.questlog.jira, jiraCredentials, deps, request.params.key)
+    afterQuestWrite()
+    return taken
+  },
+)
+
+app.post<{ Params: { id: string; key: string } }>(
+  '/api/questlog/pages/:id/quests/:key/complete',
+  async (request) => {
+    questlogPage(request.params.id)
+    guard(isIssueKey(request.params.key), 'Kein gültiger Jira-Schlüssel')
+    const handed = await completeQuest(config.questlog.jira, jiraCredentials, deps, request.params.key)
+    afterQuestWrite()
+    return handed
   },
 )
 
