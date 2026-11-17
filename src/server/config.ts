@@ -174,6 +174,10 @@ export function parseConfig(raw: unknown): DashboardConfig {
     },
     questlog: parseQuestlog({
       ...questlog,
+      pages:
+        Array.isArray(questlog.pages) && questlog.pages.length > 0
+          ? questlog.pages
+          : [{ id: 'sprint', title: 'Sprint', boardId: jira.boardId, jql: jira.jql }],
       jira: { ...jira, ...questlog.jira },
       cacheSeconds: { jira: cache.jira, ...questlog.cacheSeconds },
     }),

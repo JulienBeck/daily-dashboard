@@ -192,7 +192,7 @@ export function Stories({
   }
 
   return (
-    <section className="panel grid min-h-0 grid-rows-[auto_auto_1fr] border-t-2 border-t-accent">
+    <section className="look-parchment panel grid min-h-0 grid-rows-[auto_auto_1fr] border-t-2 border-t-accent">
       <div className="panel-head">
         <IconBoard className="text-sm" />
         <span className="flex-1">Stories im Sprint</span>

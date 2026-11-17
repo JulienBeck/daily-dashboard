@@ -436,8 +436,13 @@ Board durchschlägt. Tailwind scannt das Verzeichnis bewusst nicht (`@source not
 `src/web/index.css`): Klassennamen wie `collapse` sind dort Utilities und würden die Knöpfe des
 Buchs unsichtbar machen.
 
-Gesucht wird die Story der Reihe nach auf den konfigurierten Buchseiten. Steht sie auf keiner,
-öffnet das Buch auf der letzten Seite mit deren erster Quest.
+**Ohne eigene Buchseiten zeigt das Buch den Sprint des Boards** — eine Seite „Sprint“ aus
+`jira.boardId` bzw. `jira.jql`, also genau die Stories, die auch auf dem Board stehen. Eigene
+Seiten unter `questlog.pages` ersetzen sie; soll der Sprint dann dabei bleiben, gehört er als
+eigene Seite mit in die Liste.
+
+Gesucht wird die Story der Reihe nach auf den Buchseiten. Steht sie auf keiner, öffnet das Buch
+auf der letzten Seite mit deren erster Quest.
 
 Was im Buch geändert wird — annehmen, abgeben, neu anlegen —, sieht das Board beim Schließen
 sofort; umgekehrt vergisst der Proxy die Buchseiten, sobald eine Karte verschoben wurde.
@@ -464,7 +469,7 @@ Ein eigener Abschnitt `questlog` in derselben Datei. Jira-Adresse, `flavor`,
 
 | Schlüssel | Wirkung |
 |---|---|
-| `questlog.pages[]` | je Buchseite ein Eintrag mit `id`, `title`, `boardId` **oder** `jql` (gesetzt schlägt `jql`) und optional `create`. Ohne `create` ist die Seite nur lesend |
+| `questlog.pages[]` | je Buchseite ein Eintrag mit `id`, `title`, `boardId` **oder** `jql` (gesetzt schlägt `jql`) und optional `create`. Ohne `create` ist die Seite nur lesend. **Weggelassen oder leer: eine Seite „Sprint“ aus `jira.boardId`/`jira.jql`** |
 | `questlog.pages[].create` | `project`, `issueType` und `labels` für selbst vergebene Quests |
 | `questlog.jira.maxQuests` | wie viele Vorgänge je Seite geholt werden, Vorgabe 100 |
 | `questlog.jira.epicLinkField` / `epicNameField` | nur nötig, wenn die Felder in der Instanz umbenannt wurden |

@@ -43,7 +43,7 @@
 :root[data-season='autumn'] { --accent: #d2691e; --accent-rgb: 210 105 30; }
 :root[data-season='winter'] { --accent: #8ec8e0; --accent-rgb: 142 200 224; }
 
-@theme {
+@theme inline {
   --color-plane: var(--plane);
   --color-surface: var(--surface);
   --color-card: var(--card);

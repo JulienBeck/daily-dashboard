@@ -296,4 +296,31 @@ describe('readConfigText', () => {
         .cacheSeconds.jira,
     ).toBe(10)
   })
+
+  it('opens the book on the board sprint when no pages are configured', () => {
+    const config = parseConfig({ jira: { boardId: 253 } })
+    expect(config.questlog.pages).toEqual([
+      { id: 'sprint', title: 'Sprint', boardId: 253, jql: null, create: null },
+    ])
+  })
+
+  it('takes the board query for that page when the board runs on free jql', () => {
+    const config = parseConfig({ jira: { jql: 'project = KI AND sprint in openSprints()' } })
+    expect(config.questlog.pages[0]).toMatchObject({
+      boardId: null,
+      jql: 'project = KI AND sprint in openSprints()',
+    })
+  })
+
+  it('treats an empty page list like a missing one', () => {
+    expect(parseConfig({ jira: { boardId: 7 }, questlog: { pages: [] } }).questlog.pages).toHaveLength(1)
+  })
+
+  it('leaves configured pages alone and adds no sprint page to them', () => {
+    const config = parseConfig({
+      jira: { boardId: 253 },
+      questlog: { pages: [{ id: 'side', title: 'Sidequests', jql: 'labels = side' }] },
+    })
+    expect(config.questlog.pages.map((page) => page.id)).toEqual(['side'])
+  })
 })
