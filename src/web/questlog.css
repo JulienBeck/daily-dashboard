@@ -1,0 +1,123 @@
+@font-face {
+  font-family: Caudex;
+  src: url('./assets/questlog/Caudex-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Caudex;
+  src: url('./assets/questlog/Caudex-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Caudex;
+  src: url('./assets/questlog/Caudex-Italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+:root[data-look='questlog'] {
+  color-scheme: light;
+
+  --plane: #f4e8cc;
+  --surface: #e3cc9f;
+  --card: rgba(94, 65, 24, 0.12);
+  --ink: #1d140a;
+  --ink-2: #3b2a16;
+  --ink-muted: #5a4428;
+  --hairline: rgba(94, 65, 24, 0.25);
+  --rule: #a68a5c;
+
+  --good: #00724f;
+  --warning: #846600;
+  --serious: #9c4414;
+  --critical: #9e1b1b;
+  --critical-rgb: 158 27 27;
+  --running: #6b5a45;
+  --idle: #6b5a45;
+
+  --step-1: #3b2a16;
+  --step-2: #6e5535;
+  --step-3: #97794d;
+
+  --accent: #9c4414;
+  --accent-rgb: 156 68 20;
+
+  --color-white: #3b2a12;
+
+  --ql-serif: Caudex, 'Palatino Linotype', Palatino, Georgia;
+  --ql-stone: #46423d;
+  --ql-backdrop: #252320;
+  --ql-tex-stone: url('./assets/questlog/stone.webp');
+  --ql-tex-stone-size: 512px;
+  --ql-tex-parchment: url('./assets/questlog/parchment-fill.webp');
+  --ql-edge-rim: url('./assets/questlog/rim.png') 30 / 15px / 4px round;
+  --ql-edge-panel: url('./assets/questlog/panel.png') 18 / 9px / 2px round;
+  --ql-sunk-shadow: 0 3px 7px rgba(0, 0, 0, 0.6), 0 0 2px rgba(0, 0, 0, 0.7);
+  --ql-wash: rgba(244, 230, 196, 0.6);
+}
+
+:root[data-look='questlog'][data-season='spring'] {
+  --accent: #46742a;
+  --accent-rgb: 70 116 42;
+}
+
+:root[data-look='questlog'][data-season='summer'] {
+  --accent: #806000;
+  --accent-rgb: 128 96 0;
+}
+
+:root[data-look='questlog'][data-season='autumn'] {
+  --accent: #9c4414;
+  --accent-rgb: 156 68 20;
+}
+
+:root[data-look='questlog'][data-season='winter'] {
+  --accent: #2c6a88;
+  --accent-rgb: 44 106 136;
+}
+
+:root[data-look='questlog'] body {
+  background-color: var(--ql-backdrop);
+  background-image: var(--ql-tex-stone);
+  background-size: var(--ql-tex-stone-size);
+  background-blend-mode: multiply;
+  font-family: var(--ql-serif), serif;
+}
+
+:root[data-look='questlog'] body::before {
+  display: none;
+}
+
+:root[data-look='questlog'] .app-frame {
+  border: 6px solid transparent;
+  border-image: var(--ql-edge-rim);
+  background-color: var(--ql-stone);
+  background-image:
+    radial-gradient(ellipse 110% 95% at 50% 42%, transparent 55%, rgba(0, 0, 0, 0.38) 100%),
+    linear-gradient(180deg, rgba(255, 250, 240, 0.05) 0%, rgba(0, 0, 0, 0.22) 100%),
+    var(--ql-tex-stone);
+  background-size: auto, auto, var(--ql-tex-stone-size);
+  background-blend-mode: normal, normal, multiply;
+  background-clip: padding-box;
+}
+
+:root[data-look='questlog'] .panel {
+  border-width: 5px;
+  border-style: solid;
+  border-color: transparent;
+  border-image: var(--ql-edge-panel);
+  border-radius: 0;
+  background:
+    linear-gradient(var(--ql-wash), var(--ql-wash)) padding-box,
+    var(--ql-tex-parchment) center / cover no-repeat padding-box;
+  box-shadow: var(--ql-sunk-shadow);
+  color: var(--ink);
+  text-shadow: 0 1px 0 rgba(255, 246, 216, 0.45);
+}

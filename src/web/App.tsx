@@ -20,6 +20,7 @@ import {
   moveIssue,
   moveIssueToWeek,
 } from './api.js'
+import { useLook } from './look.js'
 import { usePolled } from './usePolled.js'
 import { Ampel } from './components/Ampel.js'
 import { Burndown } from './components/Burndown.js'
@@ -47,6 +48,7 @@ function Problem({ what, message }: { what: string; message: string }) {
 export function App() {
   const [clock, setClock] = useState(() => new Date())
   const [dismissed, setDismissed] = useState(false)
+  const [look, toggleLook] = useLook()
   const [mrsCollapsed, setMrsCollapsed] = useState(
     () => localStorage.getItem('mrs-collapsed') === 'true',
   )
@@ -115,7 +117,7 @@ export function App() {
   }
 
   return (
-    <div className="relative z-1 flex h-full flex-col gap-3 p-3">
+    <div className="app-frame relative z-1 flex h-full flex-col gap-3 p-3">
       <SeasonHeader
         season={season}
         next={upcoming}
@@ -128,6 +130,8 @@ export function App() {
         epics={epics.value?.data.rows ?? []}
         epicsJql={epics.value?.data.jql ?? null}
         epicsError={epics.error}
+        look={look}
+        onToggleLook={toggleLook}
       />
 
       <Timer ask />

@@ -1,11 +1,20 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { SEASONS } from '../../shared/season.js'
+import type { Look } from '../look.js'
 import { SeasonHeader } from './SeasonHeader.js'
 
 const [winter, spring] = SEASONS
 
-const header = (over: { reminder?: boolean; daysLeft?: number; onDismiss?: () => void } = {}) =>
+interface Over {
+  reminder?: boolean
+  daysLeft?: number
+  onDismiss?: () => void
+  look?: Look
+  onToggleLook?: () => void
+}
+
+const header = (over: Over = {}) =>
   render(
     <SeasonHeader
       season={winter}
@@ -19,6 +28,8 @@ const header = (over: { reminder?: boolean; daysLeft?: number; onDismiss?: () =>
       epics={[]}
       epicsJql={null}
       epicsError={null}
+      look={over.look ?? 'classic'}
+      onToggleLook={over.onToggleLook ?? (() => undefined)}
     />,
   )
 
@@ -58,5 +69,26 @@ describe('SeasonHeader', () => {
     header({ daysLeft: 1 })
 
     expect(screen.getByText('noch 1 Arbeitstag')).toBeInTheDocument()
+  })
+
+  it('offers the questlog look as a switch that shows its state', () => {
+    const onToggleLook = vi.fn()
+    header({ look: 'questlog', onToggleLook })
+
+    const toggle = screen.getByRole('button', { name: 'Questlog-Look' })
+    expect(toggle).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.click(toggle)
+
+    expect(onToggleLook).toHaveBeenCalledOnce()
+  })
+
+  it('shows the switch released in the classic look', () => {
+    header()
+
+    expect(screen.getByRole('button', { name: 'Questlog-Look' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
   })
 })

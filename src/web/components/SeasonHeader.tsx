@@ -1,6 +1,7 @@
 import type { Season } from '../../shared/season.js'
 import type { EpicRow } from '../../shared/types.js'
 import { IconWarning } from '../icons.js'
+import type { Look } from '../look.js'
 import { SEASON_ART } from '../seasonArt.js'
 import { Epics } from './Epics.js'
 
@@ -16,6 +17,8 @@ interface Props {
   epics: EpicRow[]
   epicsJql: string | null
   epicsError: string | null
+  look: Look
+  onToggleLook: () => void
 }
 
 const dateFormat = new Intl.DateTimeFormat('de-DE', {
@@ -39,6 +42,8 @@ export function SeasonHeader({
   epics,
   epicsJql,
   epicsError,
+  look,
+  onToggleLook,
 }: Props) {
   return (
     <header className="panel grid grid-cols-[auto_auto_1fr_auto] items-center gap-5 border-l-[3px] border-l-accent py-2.5">
@@ -64,6 +69,15 @@ export function SeasonHeader({
       <Epics rows={epics} jql={epicsJql} error={epicsError} />
 
       <div className="flex items-center gap-2.5 text-right text-[11px] text-muted">
+        <button
+          type="button"
+          onClick={onToggleLook}
+          aria-pressed={look === 'questlog'}
+          title="Look-and-Feel: Questlog ein- oder ausschalten"
+          className="mr-2 rounded-md border border-white/10 bg-card px-2 py-1 text-[11px] text-ink-2 hover:border-accent hover:text-ink aria-pressed:border-accent aria-pressed:text-ink"
+        >
+          Questlog-Look
+        </button>
         <div className="leading-snug">
           <div className={`num flex items-center justify-end gap-1${reminder ? ' text-warning' : ''}`}>
             {reminder ? (
