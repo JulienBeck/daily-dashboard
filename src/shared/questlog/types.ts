@@ -83,3 +83,23 @@ export interface Payload<T> {
   stale: boolean
   error: string | null
 }
+
+export interface ProfileQuest {
+  key: string
+  title: string
+  difficulty: Difficulty
+  experience: number
+  coins: Coins
+  resolved: string | null
+  webUrl: string
+}
+
+export interface ProfilePayload {
+  name: string
+  avatar: string | null
+  experience: number
+  coins: Coins
+  completed: number
+  counted: number
+  quests: ProfileQuest[]
+}

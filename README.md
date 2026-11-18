@@ -507,15 +507,16 @@ ohnehin nichts.
 
 ## Jahreszeiten
 
-| Monate | Theme | Symbol |
+| Monate | Theme | Rahmen |
 |---|---|---|
-| Mrz – Mai | Frühling | Blüte |
-| Jun – Aug | Sommer | Sonne |
-| Sep – Nov | Herbst | Ahornblatt |
-| Dez – Feb | Winter | Schneeflocke |
+| Mrz – Mai | Frühling | Ranken und Blüten an den Kanten |
+| Jun – Aug | Sommer | Sonnenglanz auf den Oberkanten, Funkeln, Libellen und Schmetterlinge |
+| Sep – Nov | Herbst | Laub auf Ecken und Unterkante |
+| Dez – Feb | Winter | Schnee auf jeder Kachel, Eiszapfen, gefrorene Unterkante |
 
-Die Jahreszeit kommt aus dem Datum und landet als `data-season` am `<html>`-Element; das Theme ist
-damit reines CSS. `?season=winter` erzwingt eine andere — gedacht zum Vorführen des kommenden
+Die Jahreszeit kommt aus dem Datum und landet als `data-season` am `<html>`-Element; Akzentfarben
+sind damit reines CSS. Die Rahmenverzierung zeichnet `src/web/seasonDecor.ts` als SVG-Schicht über
+die gemessenen Kacheln — je Kachel anders verteilt, aber bei jedem Laden gleich. `?season=winter` erzwingt eine andere — gedacht zum Vorführen des kommenden
 Themes in der Planung. Ab dem 1. des Vormonats erscheint das Erinnerungsband.
 
 **Der Jahreszeitakzent berührt die Ampelzeile nie.** In drei von vier Jahreszeiten liegt er farblich

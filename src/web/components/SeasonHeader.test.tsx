@@ -1,7 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { SEASONS } from '../../shared/season.js'
-import type { Look } from '../look.js'
 import { SeasonHeader } from './SeasonHeader.js'
 
 const [winter, spring] = SEASONS
@@ -10,9 +9,8 @@ interface Over {
   reminder?: boolean
   daysLeft?: number
   onDismiss?: () => void
-  look?: Look
-  onToggleLook?: () => void
   preview?: boolean
+  onOpenProfile?: () => void
 }
 
 const header = (over: Over = {}) =>
@@ -29,8 +27,9 @@ const header = (over: Over = {}) =>
       epics={[]}
       epicsJql={null}
       epicsError={null}
-      look={over.look ?? 'classic'}
-      onToggleLook={over.onToggleLook ?? (() => undefined)}
+      profile={null}
+      profileError={null}
+      onOpenProfile={over.onOpenProfile ?? (() => undefined)}
     />,
   )
 
@@ -72,36 +71,8 @@ describe('SeasonHeader', () => {
     expect(screen.getByText('noch 1 Arbeitstag')).toBeInTheDocument()
   })
 
-  it('offers the questlog look as a switch that shows its state', () => {
-    const onToggleLook = vi.fn()
-    header({ look: 'questlog', onToggleLook })
-
-    const toggle = screen.getByRole('button', { name: 'Questlog-Look' })
-    expect(toggle).toHaveAttribute('aria-pressed', 'true')
-
-    fireEvent.click(toggle)
-
-    expect(onToggleLook).toHaveBeenCalledOnce()
-  })
-
-  it('shows the switch released in the classic look', () => {
+  it('shows no theme pictures, the frames carry the season', () => {
     header()
-
-    expect(screen.getByRole('button', { name: 'Questlog-Look' })).toHaveAttribute(
-      'aria-pressed',
-      'false',
-    )
-  })
-
-  it('shows this and the next theme as pictures in the classic look', () => {
-    header()
-
-    expect(screen.getByRole('img', { name: 'Winter' })).toBeInTheDocument()
-    expect(screen.getByRole('img', { name: 'Frühling' })).toBeInTheDocument()
-  })
-
-  it('drops both theme pictures in the questlog look, the frames carry the season there', () => {
-    header({ look: 'questlog' })
 
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
     expect(screen.getByText('noch 14 Arbeitstage').closest('[title]')).toHaveAttribute(
@@ -110,15 +81,24 @@ describe('SeasonHeader', () => {
     )
   })
 
-  it('still marks a forced season as preview in the questlog look', () => {
-    header({ look: 'questlog', preview: true })
+  it('marks a forced season as preview under the clock', () => {
+    header({ preview: true })
 
     expect(screen.getByText('Vorschau: Winter')).toBeInTheDocument()
   })
 
   it('names no season next to the clock without a preview', () => {
-    header({ look: 'questlog' })
+    header()
 
     expect(screen.queryByText(/Vorschau/)).not.toBeInTheDocument()
+  })
+
+  it('opens the profile from the button in the top right corner', () => {
+    const onOpenProfile = vi.fn()
+    header({ onOpenProfile })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Profil' }))
+
+    expect(onOpenProfile).toHaveBeenCalledOnce()
   })
 })

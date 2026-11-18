@@ -10,6 +10,7 @@ import type {
   SprintInfo,
   TeamMember,
 } from '../shared/types.js'
+import type { ProfilePayload } from '../shared/questlog/types.js'
 
 export interface BoardConfig {
   team: TeamMember[]
@@ -52,6 +53,7 @@ export const getCommits = () => get<Payload<CommitsPayload>>('/commits')
 export const getCalendar = () => get<Payload<CalendarByMember>>('/calendar')
 export const getEpics = () => get<Payload<EpicsPayload>>('/epics')
 export const getBurndown = () => get<Payload<BurndownPayload>>('/burndown')
+export const getProfile = () => get<Payload<ProfilePayload>>('/profile')
 
 export const moveIssue = (key: string, lane: IssueRow['lane']) =>
   post<{ key: string; lane: IssueRow['lane']; status: string }>(

@@ -25,6 +25,7 @@ import {
   fetchPage,
   type NewQuest,
 } from './questlog/jira.js'
+import { fetchProfile } from './questlog/profile.js'
 
 const config = loadConfig()
 const cache = new StaleCache()
@@ -207,6 +208,7 @@ const questlogPage = (id: string) => {
 
 function forgetQuestlogPages() {
   for (const page of config.questlog.pages) cache.invalidate(`questlog:${page.id}`)
+  cache.invalidate('profile')
 }
 
 function afterQuestWrite() {
@@ -224,6 +226,15 @@ app.get('/api/questlog', async () => ({
   refreshSeconds: config.questlog.refreshSeconds,
   jiraBaseUrl: config.questlog.jira.baseUrl,
 }))
+
+app.get('/api/profile', async () => {
+  guard(Boolean(jiraCredentials.token), 'JIRA_TOKEN ist nicht gesetzt')
+  guard(Boolean(config.questlog.jira.baseUrl), 'Keine Jira-Adresse konfiguriert')
+  const boardId = config.questlog.pages.find((page) => page.boardId != null)?.boardId ?? null
+  return cache.get('profile', config.questlog.cacheSeconds.jira, () =>
+    fetchProfile(config.questlog.jira, boardId, jiraCredentials, deps),
+  )
+})
 
 app.get<{ Params: { id: string } }>('/api/questlog/pages/:id', async (request) => {
   const page = questlogPage(request.params.id)

@@ -90,7 +90,7 @@ export function Epics({ rows, jql, error }: Props) {
                 target="_blank"
                 rel="noreferrer"
                 title={`${epic.key} · ${epic.status}`}
-                className="look-parchment flex h-full min-w-0 items-start gap-2 rounded-md border border-white/10 border-l-2 bg-card px-2.5 py-1.5 no-underline hover:border-white/25"
+                className="parchment flex h-full min-w-0 items-start gap-2 rounded-md border border-white/10 border-l-2 bg-card px-2.5 py-1.5 no-underline hover:border-white/25"
                 style={{ borderLeftColor: LANE_COLOUR[epic.lane] }}
               >
                 <IconEpic

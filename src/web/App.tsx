@@ -16,15 +16,16 @@ import {
   getEpics,
   getMergeRequests,
   getPipelines,
+  getProfile,
   getSprint,
   moveIssue,
   moveIssueToWeek,
 } from './api.js'
-import { useLook } from './look.js'
 import { usePolled } from './usePolled.js'
 import { Ampel } from './components/Ampel.js'
 import { MergeRequests } from './components/MergeRequests.js'
 import { People } from './components/People.js'
+import { ProfileWindow } from './components/Profile.js'
 import { SeasonDecor } from './components/SeasonDecor.js'
 import { SeasonHeader } from './components/SeasonHeader.js'
 import { SprintTile } from './components/SprintTile.js'
@@ -50,8 +51,8 @@ function Problem({ what, message }: { what: string; message: string }) {
 export function App() {
   const [clock, setClock] = useState(() => new Date())
   const [dismissed, setDismissed] = useState(false)
-  const [look, toggleLook] = useLook()
   const [questKey, setQuestKey] = useState<string | null>(null)
+  const [profileOpen, setProfileOpen] = useState(false)
   const [mrsCollapsed, setMrsCollapsed] = useState(
     () => localStorage.getItem('mrs-collapsed') === 'true',
   )
@@ -80,6 +81,7 @@ export function App() {
   const calendar = usePolled(useCallback(() => getCalendar(), []), refresh * 5)
   const epics = usePolled(useCallback(() => getEpics(), []), refresh * 5)
   const burndown = usePolled(useCallback(() => getBurndown(), []), refresh * 5)
+  const profile = usePolled(useCallback(() => getProfile(), []), refresh * 5)
 
   const season = forced ?? seasonFor(clock)
   const start = nextSeasonStart(clock)
@@ -98,6 +100,13 @@ export function App() {
   const showReminder = reminderActive(clock, lead) && !dismissed
 
   const reloadSprint = sprint.reload
+  const reloadProfile = profile.reload
+  const openProfile = useCallback(() => {
+    setProfileOpen(true)
+    void reloadProfile()
+  }, [reloadProfile])
+  const closeProfile = useCallback(() => setProfileOpen(false), [])
+
   const onMove = useCallback(
     async (key: string, lane: IssueRow['lane']) => {
       await moveIssue(key, lane)
@@ -117,7 +126,8 @@ export function App() {
   const closeQuestlog = useCallback(() => {
     setQuestKey(null)
     void reloadSprint()
-  }, [reloadSprint])
+    void reloadProfile()
+  }, [reloadSprint, reloadProfile])
 
   const onDismiss = () => {
     localStorage.setItem(dismissKey(start.toISOString()), todayStamp(clock))
@@ -138,8 +148,9 @@ export function App() {
         epics={epics.value?.data.rows ?? []}
         epicsJql={epics.value?.data.jql ?? null}
         epicsError={epics.error}
-        look={look}
-        onToggleLook={toggleLook}
+        profile={profile.value?.data ?? null}
+        profileError={profile.error}
+        onOpenProfile={openProfile}
       />
 
       <Timer ask />
@@ -202,7 +213,11 @@ export function App() {
         />
       )}
 
-      {look === 'questlog' ? <SeasonDecor season={season.key} /> : null}
+      <SeasonDecor season={season.key} />
+
+      {profileOpen ? (
+        <ProfileWindow profile={profile.value?.data ?? null} error={profile.error} onClose={closeProfile} />
+      ) : null}
 
       {questKey ? (
         <Suspense fallback={null}>

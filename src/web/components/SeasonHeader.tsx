@@ -1,9 +1,9 @@
 import type { Season } from '../../shared/season.js'
+import type { ProfilePayload } from '../../shared/questlog/types.js'
 import type { EpicRow } from '../../shared/types.js'
 import { IconWarning } from '../icons.js'
-import type { Look } from '../look.js'
-import { SEASON_ART } from '../seasonArt.js'
 import { Epics } from './Epics.js'
+import { ProfileButton } from './Profile.js'
 
 interface Props {
   season: Season
@@ -17,8 +17,9 @@ interface Props {
   epics: EpicRow[]
   epicsJql: string | null
   epicsError: string | null
-  look: Look
-  onToggleLook: () => void
+  profile: ProfilePayload | null
+  profileError: string | null
+  onOpenProfile: () => void
 }
 
 const dateFormat = new Intl.DateTimeFormat('de-DE', {
@@ -42,48 +43,25 @@ export function SeasonHeader({
   epics,
   epicsJql,
   epicsError,
-  look,
-  onToggleLook,
+  profile,
+  profileError,
+  onOpenProfile,
 }: Props) {
-  const framed = look === 'questlog'
   return (
-    <header className={`panel grid ${framed ? 'grid-cols-[auto_1fr_auto]' : 'grid-cols-[auto_auto_1fr_auto]'} items-center gap-5 border-l-[3px] border-l-accent py-2.5`}>
-      {framed ? null : (
-        <div className="text-center">
-          <img
-            src={SEASON_ART[season.key]}
-            alt={season.label}
-            className="size-16 rounded-md"
-            width={64}
-            height={64}
-          />
-          <div className="mt-1 text-[10px] text-muted">{season.span}</div>
-          {preview ? <div className="text-[10px] text-accent">Vorschau</div> : null}
-        </div>
-      )}
-
+    <header className="panel grid grid-cols-[auto_1fr_auto] items-center gap-5 border-l-[3px] border-l-accent py-2.5">
       <div className="border-r border-rule pr-5 text-center">
         <div className="num text-[28px] leading-none font-semibold tracking-tight">
           {timeFormat.format(clock)}
         </div>
         <div className="mt-1 text-[11px] text-ink-2">{dateFormat.format(clock)}</div>
-        {framed && preview ? (
+        {preview ? (
           <div className="text-[10px] text-accent">Vorschau: {season.label}</div>
         ) : null}
       </div>
 
       <Epics rows={epics} jql={epicsJql} error={epicsError} />
 
-      <div className="flex items-center gap-2.5 text-right text-[11px] text-muted">
-        <button
-          type="button"
-          onClick={onToggleLook}
-          aria-pressed={look === 'questlog'}
-          title="Look-and-Feel: Questlog ein- oder ausschalten"
-          className="mr-2 rounded-md border border-white/10 bg-card px-2 py-1 text-[11px] text-ink-2 hover:border-accent hover:text-ink aria-pressed:border-accent aria-pressed:text-ink"
-        >
-          Questlog-Look
-        </button>
+      <div className="flex items-center gap-4 text-right text-[11px] text-muted">
         <div className="leading-snug" title={`nächstes Theme: ${next.label}`}>
           <div className={`num flex items-center justify-end gap-1${reminder ? ' text-warning' : ''}`}>
             {reminder ? (
@@ -103,16 +81,7 @@ export function SeasonHeader({
           </div>
           <div>ab {shortDate.format(nextStart)}</div>
         </div>
-        {framed ? null : (
-          <img
-            src={SEASON_ART[next.key]}
-            alt={next.label}
-            title={`nächstes Theme: ${next.label}`}
-            className="size-[42px] shrink-0 rounded-md"
-            width={42}
-            height={42}
-          />
-        )}
+        <ProfileButton profile={profile} error={profileError} onOpen={onOpenProfile} />
       </div>
     </header>
   )

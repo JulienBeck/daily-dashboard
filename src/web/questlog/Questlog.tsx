@@ -21,9 +21,10 @@ const FILTERS: Filter[] = ['all', 'available', 'active', 'complete']
 
 interface Props {
   initialKey?: string | null
+  onClose?: () => void
 }
 
-export function Questlog({ initialKey = null }: Props) {
+export function Questlog({ initialKey = null, onClose }: Props) {
   const t = useStrings()
   const log = usePolled(getQuestlog, 0, [])
   const [pageId, setPageId] = useState<string | null>(null)
@@ -153,6 +154,12 @@ export function Questlog({ initialKey = null }: Props) {
   return (
     <div className="frame">
       <div className="portrait" aria-hidden="true" />
+
+      {onClose ? (
+        <button type="button" className="ql-close" aria-label={t.close} onClick={onClose}>
+          ×
+        </button>
+      ) : null}
 
       <div className="titlebar">
         <h1>{t.title}</h1>

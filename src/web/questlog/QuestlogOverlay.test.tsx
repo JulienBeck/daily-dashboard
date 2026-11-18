@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as api from './api'
+import { Questlog } from './Questlog'
 import QuestlogOverlay from './QuestlogOverlay'
 
 vi.mock('./api')
@@ -30,6 +31,21 @@ describe('QuestlogOverlay', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Questlog schließen' }))
 
     expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('hangs the close button on the window corner, not on the backdrop', () => {
+    overlay()
+
+    const close = screen.getByRole('button', { name: 'Questlog schließen' })
+    expect(close.parentElement).toHaveClass('frame')
+    expect(close).toHaveClass('ql-close')
+    expect(close).not.toHaveClass('collapse')
+  })
+
+  it('shows no close button when the questlog stands alone', () => {
+    render(<Questlog />)
+
+    expect(screen.queryByRole('button', { name: 'Questlog schließen' })).not.toBeInTheDocument()
   })
 
   it('closes with escape', () => {

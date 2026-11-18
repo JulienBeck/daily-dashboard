@@ -92,7 +92,7 @@ function Card({
         event.preventDefault()
         onOpen(issue.key)
       }}
-      className={`look-parchment block rounded-lg border border-white/10 border-l-2 bg-card px-2.5 py-1.5 no-underline ${
+      className={`parchment block rounded-lg border border-white/10 border-l-2 bg-card px-2.5 py-1.5 no-underline ${
         done ? 'opacity-55' : ''
       } ${draggable ? 'cursor-grab active:cursor-grabbing' : ''} ${busy ? 'animate-pulse' : ''}`}
       style={{ borderLeftColor: done ? 'var(--rule)' : accent }}

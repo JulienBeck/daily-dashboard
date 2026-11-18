@@ -209,7 +209,7 @@ export function toQuest(
   }
 }
 
-async function call<T>(
+export async function call<T>(
   config: JiraConfig,
   credentials: JiraCredentials,
   flavor: Flavor,
@@ -292,7 +292,7 @@ export function fieldList(fields: FieldIds, also: readonly string[] = []): strin
   return [...BASE_FIELDS, ...new Set(extra)].join(',')
 }
 
-async function resolveFields(
+export async function resolveFields(
   config: JiraConfig,
   credentials: JiraCredentials,
   flavor: Flavor,

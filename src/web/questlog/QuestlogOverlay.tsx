@@ -23,11 +23,8 @@ export default function QuestlogOverlay({ issueKey, onClose }: Props) {
   return (
     <div className="ql" role="dialog" aria-modal="true" aria-label="Questlog" onClick={closeOutside}>
       <div className="ql-root" onClick={closeOutside}>
-        <Questlog initialKey={issueKey} />
+        <Questlog initialKey={issueKey} onClose={onClose} />
       </div>
-      <button type="button" className="collapse ql-close" aria-label="Questlog schließen" onClick={onClose}>
-        ×
-      </button>
     </div>
   )
 }

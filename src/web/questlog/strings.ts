@@ -10,6 +10,7 @@ export interface Strings {
   locale: string
 
   title: string
+  close: string
   pages: string
 
   filters: Record<Filter, string>
@@ -74,6 +75,7 @@ export const de: Strings = {
   locale: 'de-DE',
 
   title: 'Questlog',
+  close: 'Questlog schließen',
   pages: 'Seiten',
 
   filters: { all: 'Alle', available: 'Offen', active: 'In Arbeit', complete: 'Erledigt' },
@@ -138,6 +140,7 @@ export const en: Strings = {
   locale: 'en-GB',
 
   title: 'Questlog',
+  close: 'Close questlog',
   pages: 'Pages',
 
   filters: { all: 'All', available: 'Open', active: 'In progress', complete: 'Done' },

@@ -1,31 +1,4 @@
-:root[data-look='questlog'] {
-  --plane: #110c08;
-  --surface: #120e0a;
-  --card: rgba(207, 180, 140, 0.07);
-  --ink: #f0e2c4;
-  --ink-2: #cfb48c;
-  --ink-muted: #9d8b6c;
-  --hairline: rgba(207, 180, 140, 0.14);
-  --rule: #4d3f2c;
-
-  --step-1: #e8d9b8;
-  --step-2: #a8916a;
-  --step-3: #7a6750;
-
-  --ql-serif: Caudex, 'Palatino Linotype', Palatino, Georgia;
-  --ql-stone: #46423d;
-  --ql-backdrop: #252320;
-  --ql-tex-stone: url('./assets/questlog/stone.webp');
-  --ql-tex-stone-size: 512px;
-  --ql-tex-leather: url('./assets/questlog/Background.jpg');
-  --ql-tex-parchment: url('./assets/questlog/parchment-fill.webp');
-  --ql-edge-rim: url('./assets/questlog/rim.png') 30 / 15px / 4px round;
-  --ql-edge-panel: url('./assets/questlog/panel.png') 18 / 9px / 2px round;
-  --ql-sunk-shadow: 0 3px 7px rgba(0, 0, 0, 0.6), 0 0 2px rgba(0, 0, 0, 0.7);
-  --ql-wash: rgba(244, 230, 196, 0.6);
-}
-
-:root[data-look='questlog'] .look-parchment {
+.parchment {
   color-scheme: light;
 
   --plane: #f4e8cc;
@@ -50,27 +23,23 @@
   --step-3: #97794d;
 
   --accent: #9c4414;
-  --accent-rgb: 156 68 20;
 
   --color-white: #3b2a12;
 }
 
-:root[data-look='questlog'][data-season='spring'] .look-parchment {
+:root[data-season='spring'] .parchment {
   --accent: #46742a;
-  --accent-rgb: 70 116 42;
 }
 
-:root[data-look='questlog'][data-season='summer'] .look-parchment {
+:root[data-season='summer'] .parchment {
   --accent: #806000;
-  --accent-rgb: 128 96 0;
 }
 
-:root[data-look='questlog'][data-season='winter'] .look-parchment {
+:root[data-season='winter'] .parchment {
   --accent: #2c6a88;
-  --accent-rgb: 44 106 136;
 }
 
-:root[data-look='questlog'] body {
+body {
   background-color: var(--ql-backdrop);
   background-image: var(--ql-tex-stone);
   background-size: var(--ql-tex-stone-size);
@@ -78,11 +47,7 @@
   font-family: var(--ql-serif), serif;
 }
 
-:root[data-look='questlog'] body::before {
-  display: none;
-}
-
-:root[data-look='questlog'] .app-frame {
+.app-frame {
   border: 6px solid transparent;
   border-image: var(--ql-edge-rim);
   background-color: var(--ql-stone);
@@ -95,7 +60,7 @@
   background-clip: padding-box;
 }
 
-:root[data-look='questlog'] .panel {
+.panel {
   border-width: 5px;
   border-style: solid;
   border-color: transparent;
@@ -109,10 +74,37 @@
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.9);
 }
 
-:root[data-look='questlog'] .look-parchment {
+.parchment {
   background:
     linear-gradient(var(--ql-wash), var(--ql-wash)) padding-box,
     var(--ql-tex-parchment) center / cover no-repeat padding-box;
   color: var(--ink);
   text-shadow: 0 1px 0 rgba(255, 246, 216, 0.45);
+}
+
+/* Square metal stud: the profile button and the close buttons on the windows. */
+.metal-button {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 5px solid transparent;
+  border-image: url('./assets/questlog/strip.png') 10 / 5px stretch;
+  background-color: #2c2a27;
+  background-image:
+    linear-gradient(180deg, rgba(255, 250, 240, 0.08) 0%, rgba(0, 0, 0, 0.35) 100%),
+    var(--ql-tex-stone);
+  background-size: auto, var(--ql-tex-stone-size);
+  background-blend-mode: normal, multiply;
+  background-clip: padding-box;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+  color: #ffd100;
+  cursor: pointer;
+}
+
+.metal-button:hover {
+  filter: brightness(1.25);
+}
+
+.metal-button:active {
+  transform: translateY(1px);
 }
