@@ -1,8 +1,10 @@
+import { type EquipmentPayload, itemById, sameSlot, STARTER } from '../../shared/avatar.js'
 import type { PagePayload, ProfilePayload, Quest } from '../../shared/questlog/types.js'
 import type { InboxPayload, Person, RewardDraft, Weighted } from '../../shared/rewards.js'
 import type { Db } from '../db.js'
 import type { JiraConfig } from '../questlog/config.js'
 import type { JiraCredentials, JiraDeps } from '../questlog/jira.js'
+import { inventory, outfit, setEquipped } from './equipment.js'
 import { fetchLegacy, fetchMe, fetchQuestRecord, type Me, searchUsers } from './jira.js'
 import {
   distribute,
@@ -152,6 +154,20 @@ export function createRewards(setup: RewardsSetup) {
       await markRead(db, await currentUser(), ids, deps.now())
     },
 
+    async equipment(): Promise<EquipmentPayload> {
+      const user = await currentUser()
+      await outfit(db, user, STARTER, deps.now())
+      return { items: await inventory(db, user.id) }
+    },
+
+    async equip(itemId: string, equipped: boolean): Promise<EquipmentPayload> {
+      if (!itemById(itemId)) throw new Error(`Unbekannter Gegenstand: ${itemId}`)
+      const user = await currentUser()
+      await outfit(db, user, STARTER, deps.now())
+      await setEquipped(db, user.id, itemId, sameSlot(itemId), equipped)
+      return { items: await inventory(db, user.id) }
+    },
+
     users(query: string): Promise<Person[]> {
       return searchUsers(jira, credentials, deps, query)
     },
@@ -174,4 +190,11 @@ export function parseShares(raw: unknown): Weighted[] {
 
 export function parseIds(raw: unknown): number[] {
   return Array.isArray(raw) ? raw.filter((id): id is number => Number.isInteger(id)) : []
+}
+
+export function parseEquip(raw: unknown): { item: string; equipped: boolean } {
+  const { item, equipped } = (raw ?? {}) as Record<string, unknown>
+  if (typeof item !== 'string' || !item) throw new Error('Ausrüstung: Gegenstand fehlt')
+  if (typeof equipped !== 'boolean') throw new Error('Ausrüstung: anlegen oder ablegen?')
+  return { item, equipped }
 }

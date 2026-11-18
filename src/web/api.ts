@@ -10,6 +10,7 @@ import type {
   SprintInfo,
   TeamMember,
 } from '../shared/types.js'
+import type { EquipmentPayload } from '../shared/avatar.js'
 import type { ProfilePayload } from '../shared/questlog/types.js'
 import type { InboxPayload, Person, RewardDraft, Weighted } from '../shared/rewards.js'
 
@@ -60,6 +61,9 @@ export const markRead = (ids: number[]) => post<{ ok: boolean }>('/inbox/read', 
 export const getReward = (key: string) => get<RewardDraft>(`/rewards/${encodeURIComponent(key)}`)
 export const distributeReward = (key: string, shares: Weighted[]) =>
   post<RewardDraft>(`/rewards/${encodeURIComponent(key)}`, { shares })
+export const getEquipment = () => get<EquipmentPayload>('/equipment')
+export const setEquipped = (item: string, equipped: boolean) =>
+  post<EquipmentPayload>('/equipment', { item, equipped })
 export const searchUsers = (query: string) => get<Person[]>(`/users?q=${encodeURIComponent(query)}`)
 
 export const moveIssue = (key: string, lane: IssueRow['lane']) =>

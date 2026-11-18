@@ -518,6 +518,16 @@ der Token-Besitzer selbst vergeben hat.
 | `share` | Beteiligte je Quest: vorgeschlagener Anteil und, nach dem Verteilen, ihre XP und Münzen |
 | `message` | Posteingang: `distribute` für den Questgeber, `reward` für die Bedachten |
 | `setting` | `cutoff` |
+| `inventory` | Ausrüstung je Spieler: Gegenstand und ob er angelegt ist |
+
+**Spielfigur.** Links im Profil steht die Figur mit acht Plätzen: Kopf, Schultern, Brust, Hände,
+Beine, Füße, Waffe rechts und links. Ein Klick auf einen Platz zeigt, was dafür im Gepäck liegt —
+anlegen tauscht den Gegenstand im selben Platz, ablegen lässt ihn leer. Figur und Gegenstände sind
+SVG (`src/web/components/avatar/Figure.tsx`), die leichte Bewegung ist CSS in `src/web/frames.css`
+und steht still, wenn das System reduzierte Bewegung verlangt. Der Katalog liegt in
+`src/shared/avatar.ts`; jeder Spieler bekommt beim ersten Öffnen einmal die Grundausrüstung
+(gewöhnlich, angelegt) und eine zweite Garnitur (ungewöhnlich, im Gepäck). Kaufen mit Münzen
+kommt später.
 
 Die Tests laufen gegen ein echtes Postgres in WASM (PGlite, `src/server/rewards/memoryDb.ts`) —
 kein Docker nötig.

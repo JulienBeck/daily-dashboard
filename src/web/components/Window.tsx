@@ -4,11 +4,13 @@ export function Window({
   label,
   onClose,
   className = '',
+  wide = false,
   children,
 }: {
   label: string
   onClose: () => void
   className?: string
+  wide?: boolean
   children: ReactNode
 }) {
   useEffect(() => {
@@ -29,13 +31,13 @@ export function Window({
         role="dialog"
         aria-modal="true"
         aria-label={label}
-        className={`panel relative max-h-[86vh] w-[min(760px,94vw)] px-6 py-5 ${className}`}
+        className={`panel relative max-h-[90vh] ${wide ? 'w-[min(1120px,96vw)]' : 'w-[min(760px,94vw)]'} px-6 py-5 ${className}`}
       >
         <button
           type="button"
           onClick={onClose}
           aria-label={`${label} schließen`}
-          className="metal-button absolute -top-2.5 -right-2.5 z-10 size-8 text-[20px] leading-none font-bold"
+          className="red-button absolute -top-2.5 -right-2.5 z-10 size-8 font-[Arial,sans-serif] text-[18px] leading-none font-bold"
         >
           ×
         </button>

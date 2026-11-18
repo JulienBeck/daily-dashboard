@@ -27,7 +27,7 @@ import {
 } from './questlog/jira.js'
 import { postgres, retry } from './db.js'
 import { migrate } from './rewards/schema.js'
-import { createRewards, parseIds, parseShares, type Rewards } from './rewards/service.js'
+import { createRewards, parseEquip, parseIds, parseShares, type Rewards } from './rewards/service.js'
 
 const config = loadConfig()
 const REWARD_SYNC_MS = 5 * 60_000
@@ -292,6 +292,13 @@ app.post<{ Params: { key: string }; Body: { shares?: unknown } }>('/api/rewards/
   const result = await service.distribute(request.params.key, parseShares(request.body?.shares))
   cache.invalidate('profile')
   return result
+})
+
+app.get('/api/equipment', async () => rewardsReady().equipment())
+
+app.post<{ Body: unknown }>('/api/equipment', async (request) => {
+  const { item, equipped } = parseEquip(request.body)
+  return rewardsReady().equip(item, equipped)
 })
 
 app.get<{ Querystring: { q?: string } }>('/api/users', async (request) =>

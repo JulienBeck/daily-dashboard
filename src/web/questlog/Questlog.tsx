@@ -156,7 +156,7 @@ export function Questlog({ initialKey = null, onClose }: Props) {
       <div className="portrait" aria-hidden="true" />
 
       {onClose ? (
-        <button type="button" className="ql-close" aria-label={t.close} onClick={onClose}>
+        <button type="button" className="btn ql-close" aria-label={t.close} onClick={onClose}>
           ×
         </button>
       ) : null}

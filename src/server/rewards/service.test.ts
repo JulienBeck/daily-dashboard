@@ -9,6 +9,7 @@ import {
   dueDate,
   FALLBACK_DUE_DAYS,
   parseIds,
+  parseEquip,
   parseShares,
   type SprintWindow,
   SYNC_SECONDS,
@@ -74,7 +75,7 @@ afterAll(async () => {
 })
 
 beforeEach(async () => {
-  await db.query('truncate message, share, quest, player, setting restart identity cascade')
+  await db.query('truncate inventory, message, share, quest, player, setting restart identity cascade')
 })
 
 function setup(over: { me?: object; quests?: Quest[]; resolved?: string; sprint?: SprintWindow | null } = {}) {
@@ -312,5 +313,40 @@ describe('users', () => {
     const { rewards } = setup()
 
     expect(await rewards.users('anna')).toEqual([{ id: 'JIRAUSER1', name: 'Anna Berg' }])
+  })
+})
+
+describe('parseEquip', () => {
+  it('wants an item and whether to put it on', () => {
+    expect(parseEquip({ item: 'iron-helm', equipped: true })).toEqual({ item: 'iron-helm', equipped: true })
+    expect(() => parseEquip({ equipped: true })).toThrow('Gegenstand fehlt')
+    expect(() => parseEquip({ item: 'iron-helm', equipped: 'ja' })).toThrow('anlegen oder ablegen')
+    expect(() => parseEquip(null)).toThrow('Gegenstand fehlt')
+  })
+})
+
+describe('equipment', () => {
+  it('dresses the player in the starter kit on first sight', async () => {
+    const { rewards } = setup({ me: anna })
+
+    const result = await rewards.equipment()
+
+    expect(result.items.filter((item) => item.equipped).map((item) => item.id)).toContain('wool-hood')
+    expect(result.items.find((item) => item.id === 'iron-helm')).toEqual({ id: 'iron-helm', equipped: false })
+  })
+
+  it('swaps an item in its slot', async () => {
+    const { rewards } = setup({ me: anna })
+
+    const result = await rewards.equip('iron-helm', true)
+
+    expect(result.items.find((item) => item.id === 'iron-helm')?.equipped).toBe(true)
+    expect(result.items.find((item) => item.id === 'wool-hood')?.equipped).toBe(false)
+  })
+
+  it('refuses an item that does not exist', async () => {
+    const { rewards } = setup({ me: anna })
+
+    await expect(rewards.equip('golden-crown', true)).rejects.toThrow('Unbekannter Gegenstand: golden-crown')
   })
 })

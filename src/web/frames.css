@@ -108,3 +108,114 @@ body {
 .metal-button:active {
   transform: translateY(1px);
 }
+
+/* The questlog's red lacquer button (questlog.css, .ql .btn) for the windows
+   on the board: same bezel, texture and faces, so both read as one control. */
+.red-button {
+  display: grid;
+  place-items: center;
+  padding: 0 0 2px;
+  border: 4px solid transparent;
+  border-image: url('./assets/questlog/btn-strip-bright.png') 16 / 8px / 2px stretch;
+  background-image:
+    url('./assets/questlog/lacquer.webp'),
+    linear-gradient(180deg, #640b0e 0%, #a8181d 14%, #9a151a 40%, #7e0f13 72%, #5a080b 100%);
+  background-size: 256px, auto;
+  background-blend-mode: multiply, normal;
+  background-clip: padding-box;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.6),
+    inset 0 2px 0 -1px rgba(255, 160, 140, 0.3),
+    inset 0 -5px 6px -3px rgba(0, 0, 0, 0.35),
+    inset 0 0 9px rgba(0, 0, 0, 0.25);
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.7));
+  color: #ffd100;
+  text-shadow: 0 1px 0 #000, 0 0 3px rgba(0, 0, 0, 0.85);
+  cursor: pointer;
+}
+
+.red-button:hover {
+  background-image:
+    url('./assets/questlog/lacquer.webp'),
+    linear-gradient(180deg, #760d11 0%, #c42027 14%, #b31c22 40%, #941318 72%, #6a0a0d 100%);
+  color: #fff0a8;
+}
+
+.red-button:active {
+  padding: 1px 0 1px;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.7),
+    inset 0 3px 6px rgba(0, 0, 0, 0.75);
+}
+
+/* The avatar idles: a slow rise and fall, breath in the chest, arms that
+   hang loose and a blink now and then. Origins are viewBox units of Figure. */
+.avatar :is(.avatar-idle, .avatar-breathe, .avatar-arm-right, .avatar-arm-left, .avatar-head, .avatar-eyes) {
+  transform-box: view-box;
+}
+
+.avatar .avatar-idle {
+  animation: avatar-sway 4.2s ease-in-out infinite;
+}
+
+.avatar .avatar-breathe {
+  transform-origin: 100px 170px;
+  animation: avatar-breathe 4.2s ease-in-out infinite;
+}
+
+.avatar .avatar-arm-right {
+  transform-origin: 66px 92px;
+  animation: avatar-arm-right 4.2s ease-in-out infinite;
+}
+
+.avatar .avatar-arm-left {
+  transform-origin: 134px 92px;
+  animation: avatar-arm-left 4.2s ease-in-out infinite;
+}
+
+.avatar .avatar-head {
+  transform-origin: 100px 76px;
+  animation: avatar-head 7s ease-in-out infinite;
+}
+
+.avatar .avatar-eyes {
+  transform-origin: 100px 49px;
+  animation: avatar-blink 5.3s linear infinite;
+}
+
+@keyframes avatar-sway {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1.6px); }
+}
+
+@keyframes avatar-breathe {
+  0%, 100% { transform: scale(1, 1); }
+  50% { transform: scale(1.012, 1.022); }
+}
+
+@keyframes avatar-arm-right {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(1.8deg); }
+}
+
+@keyframes avatar-arm-left {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-1.8deg); }
+}
+
+@keyframes avatar-head {
+  0%, 100% { transform: rotate(0deg); }
+  30% { transform: rotate(1.2deg); }
+  70% { transform: rotate(-0.8deg); }
+}
+
+@keyframes avatar-blink {
+  0%, 95%, 100% { transform: scaleY(1); }
+  97% { transform: scaleY(0.1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar :is(.avatar-idle, .avatar-breathe, .avatar-arm-right, .avatar-arm-left, .avatar-head, .avatar-eyes) {
+    animation: none;
+  }
+}

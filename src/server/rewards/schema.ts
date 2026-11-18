@@ -45,6 +45,14 @@ export const SCHEMA = [
     key text primary key,
     value text not null
   )`,
+  `alter table player add column if not exists outfitted_at timestamptz`,
+  `create table if not exists inventory (
+    player_id text not null references player (id),
+    item_id text not null,
+    equipped boolean not null default false,
+    acquired_at timestamptz not null default now(),
+    primary key (player_id, item_id)
+  )`,
 ]
 
 export async function migrate(db: Sql): Promise<void> {

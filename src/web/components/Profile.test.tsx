@@ -1,7 +1,14 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProfilePayload } from '../../shared/questlog/types.js'
+import * as api from '../api.js'
 import { initialsOf, ProfileButton, ProfileWindow, Purse } from './Profile.js'
+
+vi.mock('../api.js')
+
+beforeEach(() => {
+  vi.mocked(api.getEquipment).mockResolvedValue({ items: [{ id: 'wool-hood', equipped: true }] })
+})
 
 const profile = (over: Partial<ProfilePayload> = {}): ProfilePayload => ({
   name: 'Anna Berg',
@@ -138,10 +145,11 @@ describe('ProfileWindow', () => {
     expect(screen.getByText('Noch keine Quest abgeschlossen.')).toBeInTheDocument()
   })
 
-  it('keeps a place for the game character', () => {
+  it('puts the player’s figure with its equipment next to the numbers', async () => {
     windowWith(profile())
 
-    expect(screen.getByTitle('Hier steht bald deine Spielfigur')).toHaveTextContent('Spielfigur folgt')
+    expect(await screen.findByRole('button', { name: 'Kopf: Wollkapuze' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Spielfigur von Anna Berg' })).toBeInTheDocument()
   })
 
   it('says it is loading before the first answer', () => {

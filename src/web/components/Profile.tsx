@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { formatNumber } from '../../shared/questlog/quest.js'
 import type { Coins, Difficulty, ProfilePayload } from '../../shared/questlog/types.js'
+import { CharacterSheet } from './avatar/CharacterSheet.js'
 import { Window } from './Window.js'
 
 const COIN: Record<keyof Coins, { label: string; colour: string }> = {
@@ -98,10 +99,12 @@ export function ProfileWindow({
   onClose: () => void
 }) {
   return (
-    <Window label="Profil" onClose={onClose} className="grid grid-rows-[auto_auto_auto_1fr] gap-4">
-        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4">
-          <div className="metal-button size-[84px] cursor-default overflow-hidden hover:filter-none active:transform-none">
-            <Avatar profile={profile} size="size-[74px]" />
+    <Window label="Profil" onClose={onClose} wide className="grid grid-cols-[minmax(0,400px)_minmax(0,1fr)] gap-6">
+      <CharacterSheet name={profile?.name ?? 'dir'} />
+      <div className="grid min-h-0 grid-rows-[auto_auto_auto_1fr] gap-4">
+        <div className="grid grid-cols-[auto_1fr] items-center gap-4">
+          <div className="metal-button size-[64px] cursor-default overflow-hidden hover:filter-none active:transform-none">
+            <Avatar profile={profile} size="size-[54px]" />
           </div>
           <div className="min-w-0">
             <h2 className="m-0 truncate text-[24px] font-semibold">{profile?.name ?? 'Profil'}</h2>
@@ -114,12 +117,6 @@ export function ProfileWindow({
             ) : (
               <p className="m-0 mt-1 text-[12px] text-muted">Profil wird geladen …</p>
             )}
-          </div>
-          <div
-            className="grid h-[84px] w-[68px] place-items-center border border-dashed border-rule text-center text-[10px] leading-tight text-muted"
-            title="Hier steht bald deine Spielfigur"
-          >
-            Spielfigur folgt
           </div>
         </div>
 
@@ -192,6 +189,7 @@ export function ProfileWindow({
             )}
           </div>
         ) : null}
+      </div>
     </Window>
   )
 }

@@ -51,7 +51,7 @@ afterAll(async () => {
 })
 
 beforeEach(async () => {
-  await db.query('truncate message, share, quest, player, setting restart identity cascade')
+  await db.query('truncate inventory, message, share, quest, player, setting restart identity cascade')
 })
 
 const wallet = async (id: string) => {

@@ -38,7 +38,7 @@ describe('QuestlogOverlay', () => {
 
     const close = screen.getByRole('button', { name: 'Questlog schließen' })
     expect(close.parentElement).toHaveClass('frame')
-    expect(close).toHaveClass('ql-close')
+    expect(close).toHaveClass('btn', 'ql-close')
     expect(close).not.toHaveClass('collapse')
   })
 
