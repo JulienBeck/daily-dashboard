@@ -1,6 +1,7 @@
-import { type MouseEvent, type ReactNode, useEffect } from 'react'
+import type { ReactNode } from 'react'
 import { formatNumber } from '../../shared/questlog/quest.js'
 import type { Coins, Difficulty, ProfilePayload } from '../../shared/questlog/types.js'
+import { Window } from './Window.js'
 
 const COIN: Record<keyof Coins, { label: string; colour: string }> = {
   gold: { label: 'Gold', colour: '#e2b33c' },
@@ -96,35 +97,8 @@ export function ProfileWindow({
   error: string | null
   onClose: () => void
 }) {
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  const closeOutside = (event: MouseEvent) => {
-    if (event.target === event.currentTarget) onClose()
-  }
-
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-black/65 p-6" onClick={closeOutside}>
-      <section
-        role="dialog"
-        aria-modal="true"
-        aria-label="Profil"
-        className="panel relative grid max-h-[86vh] w-[min(760px,94vw)] grid-rows-[auto_auto_1fr] gap-4 px-6 py-5"
-      >
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Profil schließen"
-          className="metal-button absolute -top-2.5 -right-2.5 z-10 size-8 text-[20px] leading-none font-bold"
-        >
-          ×
-        </button>
-
+    <Window label="Profil" onClose={onClose} className="grid grid-rows-[auto_auto_auto_1fr] gap-4">
         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-4">
           <div className="metal-button size-[84px] cursor-default overflow-hidden hover:filter-none active:transform-none">
             <Avatar profile={profile} size="size-[74px]" />
@@ -166,16 +140,22 @@ export function ProfileWindow({
           <div />
         )}
 
+        {profile && profile.pending.quests > 0 ? (
+          <p className="m-0 flex flex-wrap items-center gap-x-2 text-[12px] text-ink-2" title="Der Questgeber hat noch nicht verteilt">
+            <span>Ausstehend:</span>
+            <span className="num">{formatNumber(profile.pending.experience)} XP</span>
+            <Purse coins={profile.pending.coins} />
+            <span className="text-muted">
+              aus {formatNumber(profile.pending.quests)} {profile.pending.quests === 1 ? 'Quest' : 'Quests'}
+            </span>
+          </p>
+        ) : (
+          <div />
+        )}
+
         {profile ? (
           <div className="grid min-h-0 grid-rows-[auto_1fr]">
-            <div className="panel-head">
-              Zuletzt erledigt
-              {profile.counted < profile.completed ? (
-                <span className="ml-auto normal-case tracking-normal">
-                  XP und Münzen aus den letzten {formatNumber(profile.counted)}
-                </span>
-              ) : null}
-            </div>
+            <div className="panel-head">Zuletzt erledigt</div>
             {profile.quests.length === 0 ? (
               <p className="m-0 text-[12px] text-muted">Noch keine Quest abgeschlossen.</p>
             ) : (
@@ -197,7 +177,12 @@ export function ProfileWindow({
                         </span>
                       </span>
                       <span className="flex flex-col items-end gap-0.5 text-[11px] text-ink-2">
-                        <span className="num">{formatNumber(quest.experience)} XP</span>
+                        <span className="num">
+                          {quest.share < 1 ? (
+                            <span className="mr-1.5 text-muted">{Math.round(quest.share * 100)} %</span>
+                          ) : null}
+                          {formatNumber(quest.experience)} XP
+                        </span>
                         <Purse coins={quest.coins} />
                       </span>
                     </a>
@@ -207,7 +192,6 @@ export function ProfileWindow({
             )}
           </div>
         ) : null}
-      </section>
-    </div>
+    </Window>
   )
 }

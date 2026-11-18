@@ -3,6 +3,7 @@ import type { ProfilePayload } from '../../shared/questlog/types.js'
 import type { EpicRow } from '../../shared/types.js'
 import { IconWarning } from '../icons.js'
 import { Epics } from './Epics.js'
+import { InboxButton } from './Inbox.js'
 import { ProfileButton } from './Profile.js'
 
 interface Props {
@@ -20,6 +21,9 @@ interface Props {
   profile: ProfilePayload | null
   profileError: string | null
   onOpenProfile: () => void
+  inboxCount: number
+  inboxError: string | null
+  onOpenInbox: () => void
 }
 
 const dateFormat = new Intl.DateTimeFormat('de-DE', {
@@ -46,6 +50,9 @@ export function SeasonHeader({
   profile,
   profileError,
   onOpenProfile,
+  inboxCount,
+  inboxError,
+  onOpenInbox,
 }: Props) {
   return (
     <header className="panel grid grid-cols-[auto_1fr_auto] items-center gap-5 border-l-[3px] border-l-accent py-2.5">
@@ -81,7 +88,10 @@ export function SeasonHeader({
           </div>
           <div>ab {shortDate.format(nextStart)}</div>
         </div>
-        <ProfileButton profile={profile} error={profileError} onOpen={onOpenProfile} />
+        <div className="flex gap-2">
+          <InboxButton count={inboxCount} error={inboxError} onOpen={onOpenInbox} />
+          <ProfileButton profile={profile} error={profileError} onOpen={onOpenProfile} />
+        </div>
       </div>
     </header>
   )

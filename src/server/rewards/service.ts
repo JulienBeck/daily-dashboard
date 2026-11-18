@@ -1,0 +1,177 @@
+import type { PagePayload, ProfilePayload, Quest } from '../../shared/questlog/types.js'
+import type { InboxPayload, Person, RewardDraft, Weighted } from '../../shared/rewards.js'
+import type { Db } from '../db.js'
+import type { JiraConfig } from '../questlog/config.js'
+import type { JiraCredentials, JiraDeps } from '../questlog/jira.js'
+import { fetchLegacy, fetchMe, fetchQuestRecord, type Me, searchUsers } from './jira.js'
+import {
+  distribute,
+  distributeDue,
+  draft,
+  inbox,
+  isOpened,
+  knownKeys,
+  markRead,
+  openPlayer,
+  profile,
+  recordQuest,
+  setting,
+  settleSetting,
+} from './store.js'
+
+export const ME_SECONDS = 600
+export const SYNC_SECONDS = 60
+export const FALLBACK_DUE_DAYS = 14
+const DAY = 86_400_000
+
+export interface SprintWindow {
+  start: string | null
+  end: string | null
+}
+
+export interface RewardsSetup {
+  db: Db
+  jira: JiraConfig
+  boardId: number | null
+  credentials: JiraCredentials
+  deps: JiraDeps & { now: () => Date }
+  pages: () => Promise<PagePayload[]>
+  sprint: () => Promise<SprintWindow | null>
+}
+
+export function completedQuests(pages: readonly PagePayload[]): Quest[] {
+  const byKey = new Map<string, Quest>()
+  for (const page of pages)
+    for (const series of page.series)
+      for (const quest of series.quests) if (quest.state === 'complete') byKey.set(quest.key, quest)
+  return [...byKey.values()]
+}
+
+export function dueDate(sprint: SprintWindow | null, now: Date): Date {
+  const end = sprint?.end ? new Date(sprint.end) : null
+  return end && end.getTime() > now.getTime() ? end : new Date(now.getTime() + FALLBACK_DUE_DAYS * DAY)
+}
+
+export function createRewards(setup: RewardsSetup) {
+  const { db, jira, credentials, deps } = setup
+  let me: { value: Me; at: number } | null = null
+  let lastSync = 0
+  let running: Promise<void> | null = null
+  const before = new Set<string>()
+
+  async function currentUser(): Promise<Me> {
+    const now = deps.now().getTime()
+    if (!me || now - me.at > ME_SECONDS * 1000) {
+      me = { value: await fetchMe(jira, credentials, deps), at: now }
+    }
+    return me.value
+  }
+
+  async function cutoff(sprint: SprintWindow | null): Promise<Date> {
+    const stored = await setting(db, 'cutoff')
+    if (stored) return new Date(stored)
+    const start = sprint?.start ?? deps.now().toISOString()
+    return new Date(await settleSetting(db, 'cutoff', new Date(start).toISOString()))
+  }
+
+  async function sync(): Promise<void> {
+    const now = deps.now()
+    const sprint = await setup.sprint().catch(() => null)
+    const since = await cutoff(sprint)
+    const quests = completedQuests(await setup.pages()).filter((quest) => !before.has(quest.key))
+    const known = await knownKeys(
+      db,
+      quests.map((quest) => quest.key),
+    )
+    for (const quest of quests) {
+      if (known.has(quest.key)) continue
+      const record = await fetchQuestRecord(jira, credentials, deps, quest, dueDate(sprint, now), now)
+      if (record.completedAt.getTime() < since.getTime()) {
+        before.add(quest.key)
+        continue
+      }
+      await recordQuest(db, record)
+    }
+    await distributeDue(db, now)
+  }
+
+  function syncSoon(force = false): Promise<void> {
+    if (running) return running
+    if (!force && deps.now().getTime() - lastSync < SYNC_SECONDS * 1000) return Promise.resolve()
+    running = sync()
+      .then(() => {
+        lastSync = deps.now().getTime()
+      })
+      .finally(() => {
+        running = null
+      })
+    return running
+  }
+
+  return {
+    sync: syncSoon,
+
+    async profile(): Promise<ProfilePayload> {
+      const user = await currentUser()
+      await syncSoon()
+      if (!(await isOpened(db, user.id))) {
+        const sprint = await setup.sprint().catch(() => null)
+        const legacy = await fetchLegacy(jira, setup.boardId, credentials, deps, await cutoff(sprint))
+        await openPlayer(db, user, legacy, deps.now())
+      }
+      return profile(db, user, user.avatar)
+    },
+
+    async inbox(): Promise<InboxPayload> {
+      const user = await currentUser()
+      await syncSoon()
+      return { me: { id: user.id, name: user.name }, messages: await inbox(db, user) }
+    },
+
+    async draft(key: string): Promise<RewardDraft> {
+      const found = await draft(db, key, await currentUser())
+      if (!found) throw new Error(`Keine Belohnung zu ${key} hinterlegt`)
+      return found
+    },
+
+    async distribute(key: string, shares: readonly Weighted[]): Promise<RewardDraft> {
+      const user = await currentUser()
+      const found = await draft(db, key, user)
+      if (!found) throw new Error(`Keine Belohnung zu ${key} hinterlegt`)
+      if (!found.mayDistribute) {
+        throw new Error(
+          found.distributedAt ? `${key} ist bereits verteilt` : `Nur ${found.giver?.name ?? 'der Questgeber'} verteilt ${key}`,
+        )
+      }
+      if (shares.length === 0) throw new Error('Niemand zum Verteilen angegeben')
+      await distribute(db, key, shares, user.id, deps.now())
+      return (await draft(db, key, user))!
+    },
+
+    async markRead(ids: readonly number[]): Promise<void> {
+      await markRead(db, await currentUser(), ids, deps.now())
+    },
+
+    users(query: string): Promise<Person[]> {
+      return searchUsers(jira, credentials, deps, query)
+    },
+  }
+}
+
+export type Rewards = ReturnType<typeof createRewards>
+
+export function parseShares(raw: unknown): Weighted[] {
+  if (!Array.isArray(raw)) throw new Error('Verteilung: Liste der Beteiligten fehlt')
+  return raw.map((entry: unknown) => {
+    const { id, name, share } = (entry ?? {}) as Record<string, unknown>
+    if (typeof id !== 'string' || !id.trim()) throw new Error('Verteilung: Beteiligter ohne Kennung')
+    if (typeof share !== 'number' || !Number.isFinite(share) || share < 0) {
+      throw new Error(`Verteilung: ungültiger Anteil für ${id}`)
+    }
+    return { id, name: typeof name === 'string' && name.trim() ? name : id, share }
+  })
+}
+
+export function parseIds(raw: unknown): number[] {
+  return Array.isArray(raw) ? raw.filter((id): id is number => Number.isInteger(id)) : []
+}

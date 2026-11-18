@@ -129,7 +129,7 @@ durch.
 ## Einrichten
 
 ```bash
-cp .env.example .env                                      # GITLAB_TOKEN eintragen (Scope read_api)
+cp .env.example .env                                      # GITLAB_TOKEN, JIRA_TOKEN, DATABASE_URL eintragen
 cp dashboard.config.json dashboard.config.local.json      # Gruppe, Ausschlussliste, Jira-Adresse, Team
 $EDITOR dashboard.config.local.json
 npm install
@@ -158,6 +158,7 @@ fertig. Die Tokens kommen aus `.env` neben der Compose-Datei.
 | `CALENDAR_ICS_URL` | wird durchgereicht, weil `calendar.sources[].env` sie nennt. Fehlt sie, bleibt nur dieses Panel leer |
 | `DASHBOARD_CONFIG_FILE` | welche Datei gemountet wird. **Ohne sie ist es die Beispieldatei** mit `Alice`, `Bob` und `example-group` — das Board bleibt dann leer. Für echte Daten auf `./dashboard.config.local.json` zeigen |
 | `DOCKER_SUBNET` | Notausgang, Vorgabe `172.28.0.0/24` — siehe unten |
+| `POSTGRES_PASSWORD` | Pflicht. Passwort der mitgelieferten Datenbank `db`; Compose baut daraus `DATABASE_URL` für den Proxy. Die Daten liegen im Volume `dashboard-db` — **wer es löscht, setzt alle Geldbeutel auf null** |
 
 **Kein freier Adresspool.** Scheitert `docker compose up` an
 `all predefined address pools have been fully subnetted`, liegen Catch-all-Routen auf dem Host
@@ -420,7 +421,7 @@ braucht dafür Schreibrechte; ein reiner Lesezugriff ergibt `403`.
 Ein Klick auf eine Story-Karte öffnet das **Questlog** als Overlay über dem Board, die
 angeklickte Story ist darin ausgewählt. Mit Strg, Cmd oder Shift geklickt öffnet die Karte wie
 früher Jira. Ziehen bleibt Ziehen und verschiebt die Karte (siehe „Stories verschieben").
-Schließen: das rote × oben rechts, `Esc` oder ein Klick neben das Fenster.
+Schließen: das eckige × auf der Fensterecke, `Esc` oder ein Klick neben das Fenster.
 
 Das Questlog war vorher eine eigene Anwendung und liegt jetzt vollständig hier:
 
@@ -481,6 +482,46 @@ legt Vorgänge an. Der `JIRA_TOKEN` braucht dafür **Create Issues** in jedem Pr
 `questlog.pages[].create`, und das Board gehört hinter eine Anmeldung — wer die Adresse kennt,
 vergibt sonst Quests im Namen des Token-Besitzers.
 
+## Profil, Belohnungen und Posteingang
+
+Oben rechts sitzen zwei Knöpfe: der **Posteingang** (Umschlag, rote Zahl = Neues) und das
+**Profil** (Jira-Bild). Beides braucht Postgres: `DATABASE_URL` in der `.env`, im Container
+setzt Compose sie selbst. Ohne Datenbank antworten beide mit einem Fehler im Tooltip, der Rest des
+Boards läuft weiter. Das Schema legt der Proxy beim Start an (`src/server/rewards/schema.ts`).
+
+**Wer bekommt die Belohnung einer Quest?** Der Questgeber (Reporter in Jira) entscheidet:
+
+| Schritt | Was passiert |
+|---|---|
+| Quest erledigt | Der Proxy schaut alle 5 Minuten (und sofort nach Annehmen, Abgeben, Verschieben) auf die Buchseiten. Jede neu erledigte Quest wird mit ihren Beteiligten abgelegt |
+| Beteiligte | aus dem Jira-Changelog: wer wie lange zugewiesen war. Der Vorschlag ist anteilig nach dieser Zeit |
+| Posteingang des Questgebers | Nachricht „Verteilen“. Im Dialog Anteile per Regler verschieben, Personen aus Jira dazusuchen oder entfernen, „Gleich verteilen“ |
+| Verteilt | XP und Münzen gehen auf die Konten (`player`), jeder Bedachte bekommt eine Nachricht unter „Erhalten“ |
+| Niemand verteilt | Am Sprintende verteilt der Proxy von selbst nach Vorschlag. Ohne Sprint nach 14 Tagen |
+
+Gerundet wird nach größtem Rest — die Summe der Anteile ist immer genau die Belohnung der Quest,
+im Dialog wie auf dem Server (`split` in `src/shared/rewards.ts`).
+
+**Stichtag.** Beim ersten Lauf merkt sich die Datenbank den Beginn des laufenden Sprints
+(`setting.cutoff`, ändert sich danach nie). Was davor erledigt wurde, gilt nach der alten Regel:
+die volle Belohnung an den Bearbeiter. Diese Quests bucht der Proxy einmalig, wenn jemand zum
+ersten Mal sein Profil öffnet.
+
+**Wer ist „ich“?** Bis es eine Anmeldung gibt, der Besitzer des `JIRA_TOKEN`. Verteilen darf nur,
+wer als Reporter der Quest eingetragen ist; der Posteingang zeigt also vorerst nur Quests, die
+der Token-Besitzer selbst vergeben hat.
+
+| Tabelle | Inhalt |
+|---|---|
+| `player` | Konto je Jira-Benutzer: XP und Münzen in Kupfer, Zeitpunkt des Altbestand-Imports |
+| `quest` | erledigte Quest mit Belohnung, Questgeber, Frist und wann/von wem verteilt (`auto`, `legacy` oder Benutzer) |
+| `share` | Beteiligte je Quest: vorgeschlagener Anteil und, nach dem Verteilen, ihre XP und Münzen |
+| `message` | Posteingang: `distribute` für den Questgeber, `reward` für die Bedachten |
+| `setting` | `cutoff` |
+
+Die Tests laufen gegen ein echtes Postgres in WASM (PGlite, `src/server/rewards/memoryDb.ts`) —
+kein Docker nötig.
+
 ## Was scrollt und wie die Leiste aussieht
 
 Das Board kommt **als Ganzes** ohne Scrollen aus (`body { overflow: hidden }`). Innerhalb einer
@@ -525,7 +566,7 @@ fast auf einer Ampelstufe; die Begründung samt Messwerten steht in `design/ENTW
 ## Prüfen
 
 ```bash
-npm test     # 577 Tests, Logik und Komponenten
+npm test     # gut 1000 Tests, Logik, Komponenten und Datenbank (PGlite)
 npm run lint
 npm run build
 ```

@@ -11,6 +11,7 @@ import type {
   TeamMember,
 } from '../shared/types.js'
 import type { ProfilePayload } from '../shared/questlog/types.js'
+import type { InboxPayload, Person, RewardDraft, Weighted } from '../shared/rewards.js'
 
 export interface BoardConfig {
   team: TeamMember[]
@@ -54,6 +55,12 @@ export const getCalendar = () => get<Payload<CalendarByMember>>('/calendar')
 export const getEpics = () => get<Payload<EpicsPayload>>('/epics')
 export const getBurndown = () => get<Payload<BurndownPayload>>('/burndown')
 export const getProfile = () => get<Payload<ProfilePayload>>('/profile')
+export const getInbox = () => get<InboxPayload>('/inbox')
+export const markRead = (ids: number[]) => post<{ ok: boolean }>('/inbox/read', { ids })
+export const getReward = (key: string) => get<RewardDraft>(`/rewards/${encodeURIComponent(key)}`)
+export const distributeReward = (key: string, shares: Weighted[]) =>
+  post<RewardDraft>(`/rewards/${encodeURIComponent(key)}`, { shares })
+export const searchUsers = (query: string) => get<Person[]>(`/users?q=${encodeURIComponent(query)}`)
 
 export const moveIssue = (key: string, lane: IssueRow['lane']) =>
   post<{ key: string; lane: IssueRow['lane']; status: string }>(

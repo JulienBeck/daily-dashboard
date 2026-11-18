@@ -25,9 +25,14 @@ import {
   fetchPage,
   type NewQuest,
 } from './questlog/jira.js'
-import { fetchProfile } from './questlog/profile.js'
+import { postgres, retry } from './db.js'
+import { migrate } from './rewards/schema.js'
+import { createRewards, parseIds, parseShares, type Rewards } from './rewards/service.js'
 
 const config = loadConfig()
+const REWARD_SYNC_MS = 5 * 60_000
+const DB_ATTEMPTS = 40
+const DB_RETRY_MS = 3000
 const cache = new StaleCache()
 const deps = {
   fetch: globalThis.fetch,
@@ -213,6 +218,7 @@ function forgetQuestlogPages() {
 
 function afterQuestWrite() {
   forgetQuestlogPages()
+  void rewards?.sync(true).catch((error: unknown) => app.log.warn(error))
   cache.invalidate('sprint')
   cache.invalidate('burndown')
 }
@@ -227,14 +233,70 @@ app.get('/api/questlog', async () => ({
   jiraBaseUrl: config.questlog.jira.baseUrl,
 }))
 
-app.get('/api/profile', async () => {
+const databaseUrl = process.env.DATABASE_URL ?? ''
+const db = databaseUrl ? postgres(databaseUrl) : null
+
+const rewards: Rewards | null = db
+  ? createRewards({
+      db,
+      jira: config.questlog.jira,
+      boardId: config.questlog.pages.find((page) => page.boardId != null)?.boardId ?? null,
+      credentials: jiraCredentials,
+      deps,
+      pages: async () =>
+        Promise.all(
+          config.questlog.pages.map(async (page) => {
+            const payload = await cache.get(`questlog:${page.id}`, config.questlog.cacheSeconds.jira, () =>
+              fetchPage(config.questlog.jira, page, jiraCredentials, deps),
+            )
+            return payload.data
+          }),
+        ),
+      sprint: async () => {
+        if (config.jira.boardId == null) return null
+        const payload = await cache.get('sprint', config.cacheSeconds.jira, () =>
+          fetchSprint(config.jira, jiraCredentials, deps),
+        )
+        return { start: payload.data.sprint.startDate, end: payload.data.sprint.endDate }
+      },
+    })
+  : null
+
+const rewardsReady = () => {
   guard(Boolean(jiraCredentials.token), 'JIRA_TOKEN ist nicht gesetzt')
   guard(Boolean(config.questlog.jira.baseUrl), 'Keine Jira-Adresse konfiguriert')
-  const boardId = config.questlog.pages.find((page) => page.boardId != null)?.boardId ?? null
-  return cache.get('profile', config.questlog.cacheSeconds.jira, () =>
-    fetchProfile(config.questlog.jira, boardId, jiraCredentials, deps),
-  )
+  guard(rewards != null, 'DATABASE_URL ist nicht gesetzt')
+  return rewards!
+}
+
+app.get('/api/profile', async () => {
+  const service = rewardsReady()
+  return cache.get('profile', config.questlog.cacheSeconds.jira, () => service.profile())
 })
+
+app.get('/api/inbox', async () => rewardsReady().inbox())
+
+app.post<{ Body: { ids?: unknown } }>('/api/inbox/read', async (request) => {
+  await rewardsReady().markRead(parseIds(request.body?.ids))
+  return { ok: true }
+})
+
+app.get<{ Params: { key: string } }>('/api/rewards/:key', async (request) => {
+  guard(isIssueKey(request.params.key), 'Kein gültiger Jira-Schlüssel')
+  return rewardsReady().draft(request.params.key)
+})
+
+app.post<{ Params: { key: string }; Body: { shares?: unknown } }>('/api/rewards/:key', async (request) => {
+  guard(isIssueKey(request.params.key), 'Kein gültiger Jira-Schlüssel')
+  const service = rewardsReady()
+  const result = await service.distribute(request.params.key, parseShares(request.body?.shares))
+  cache.invalidate('profile')
+  return result
+})
+
+app.get<{ Querystring: { q?: string } }>('/api/users', async (request) =>
+  rewardsReady().users(request.query.q ?? ''),
+)
 
 app.get<{ Params: { id: string } }>('/api/questlog/pages/:id', async (request) => {
   const page = questlogPage(request.params.id)
@@ -288,7 +350,20 @@ app.setErrorHandler((error: unknown, _request, reply) => {
 })
 
 const port = Number(process.env.PORT ?? 3399)
-app.listen({ port, host: '0.0.0.0' }).catch((error) => {
+
+async function start() {
+  if (db) {
+    await retry(() => migrate(db), DB_ATTEMPTS, DB_RETRY_MS, (error, attempt) =>
+      app.log.warn(`Datenbank noch nicht bereit (Versuch ${attempt}/${DB_ATTEMPTS}): ${String(error)}`),
+    )
+    setInterval(() => {
+      void rewards?.sync().catch((error: unknown) => app.log.warn(error))
+    }, REWARD_SYNC_MS)
+  }
+  await app.listen({ port, host: '0.0.0.0' })
+}
+
+start().catch((error: unknown) => {
   app.log.error(error)
   process.exit(1)
 })

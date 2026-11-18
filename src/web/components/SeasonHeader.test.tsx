@@ -11,6 +11,8 @@ interface Over {
   onDismiss?: () => void
   preview?: boolean
   onOpenProfile?: () => void
+  inboxCount?: number
+  onOpenInbox?: () => void
 }
 
 const header = (over: Over = {}) =>
@@ -30,6 +32,9 @@ const header = (over: Over = {}) =>
       profile={null}
       profileError={null}
       onOpenProfile={over.onOpenProfile ?? (() => undefined)}
+      inboxCount={over.inboxCount ?? 0}
+      inboxError={null}
+      onOpenInbox={over.onOpenInbox ?? (() => undefined)}
     />,
   )
 
@@ -100,5 +105,14 @@ describe('SeasonHeader', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Profil' }))
 
     expect(onOpenProfile).toHaveBeenCalledOnce()
+  })
+
+  it('opens the inbox from the button next to the profile and shows what is new', () => {
+    const onOpenInbox = vi.fn()
+    header({ onOpenInbox, inboxCount: 2 })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Posteingang, 2 neu' }))
+
+    expect(onOpenInbox).toHaveBeenCalledOnce()
   })
 })

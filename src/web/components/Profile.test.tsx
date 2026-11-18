@@ -9,7 +9,7 @@ const profile = (over: Partial<ProfilePayload> = {}): ProfilePayload => ({
   experience: 18450,
   coins: { gold: 12, silver: 37, copper: 40 },
   completed: 41,
-  counted: 41,
+  pending: { experience: 0, coins: { gold: 0, silver: 0, copper: 0 }, quests: 0 },
   quests: [
     {
       key: 'PRO-3990',
@@ -17,6 +17,7 @@ const profile = (over: Partial<ProfilePayload> = {}): ProfilePayload => ({
       difficulty: 'deadly',
       experience: 1650,
       coins: { gold: 0, silver: 94, copper: 0 },
+      share: 1,
       resolved: '2026-11-17T10:00:00.000+0100',
       webUrl: 'https://jira.test/browse/PRO-3990',
     },
@@ -106,20 +107,32 @@ describe('ProfileWindow', () => {
     expect(link).toHaveStyle({ borderLeftColor: '#9e1b1b' })
   })
 
-  it('says when the sums only cover the most recent quests', () => {
-    windowWith(profile({ completed: 1500, counted: 1000 }))
+  it('shows what the giver still has to distribute', () => {
+    windowWith(profile({ pending: { experience: 225, coins: { gold: 0, silver: 47, copper: 0 }, quests: 2 } }))
 
-    expect(screen.getByText('XP und Münzen aus den letzten 1.000')).toBeInTheDocument()
+    expect(screen.getByText('Ausstehend:').parentElement).toHaveTextContent('Ausstehend:225 XP47aus 2 Quests')
   })
 
-  it('says nothing about a limit when every quest is counted', () => {
+  it('says nothing about pending rewards when there are none', () => {
     windowWith(profile())
 
-    expect(screen.queryByText(/aus den letzten/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Ausstehend:')).not.toBeInTheDocument()
+  })
+
+  it('shows the player’s part of a shared quest', () => {
+    windowWith(profile({ quests: [{ ...profile().quests[0]!, share: 0.5, experience: 825 }] }))
+
+    expect(screen.getByRole('link', { name: /Suche liefert/ })).toHaveTextContent('50 %825 XP')
+  })
+
+  it('shows no part for a quest that was the player’s alone', () => {
+    windowWith(profile())
+
+    expect(screen.getByRole('link', { name: /Suche liefert/ })).not.toHaveTextContent('%')
   })
 
   it('uses the singular for a single quest and has a word for none', () => {
-    windowWith(profile({ completed: 1, counted: 1, quests: [] }))
+    windowWith(profile({ completed: 1, quests: [] }))
 
     expect(screen.getByText('1 Quest erledigt')).toBeInTheDocument()
     expect(screen.getByText('Noch keine Quest abgeschlossen.')).toBeInTheDocument()

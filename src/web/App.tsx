@@ -16,7 +16,9 @@ import {
   getEpics,
   getMergeRequests,
   getPipelines,
+  getInbox,
   getProfile,
+  markRead,
   getSprint,
   moveIssue,
   moveIssueToWeek,
@@ -25,7 +27,9 @@ import { usePolled } from './usePolled.js'
 import { Ampel } from './components/Ampel.js'
 import { MergeRequests } from './components/MergeRequests.js'
 import { People } from './components/People.js'
+import { InboxWindow, openCount } from './components/Inbox.js'
 import { ProfileWindow } from './components/Profile.js'
+import { RewardDialog } from './components/RewardDialog.js'
 import { SeasonDecor } from './components/SeasonDecor.js'
 import { SeasonHeader } from './components/SeasonHeader.js'
 import { SprintTile } from './components/SprintTile.js'
@@ -53,6 +57,8 @@ export function App() {
   const [dismissed, setDismissed] = useState(false)
   const [questKey, setQuestKey] = useState<string | null>(null)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [inboxOpen, setInboxOpen] = useState(false)
+  const [rewardKey, setRewardKey] = useState<string | null>(null)
   const [mrsCollapsed, setMrsCollapsed] = useState(
     () => localStorage.getItem('mrs-collapsed') === 'true',
   )
@@ -82,6 +88,7 @@ export function App() {
   const epics = usePolled(useCallback(() => getEpics(), []), refresh * 5)
   const burndown = usePolled(useCallback(() => getBurndown(), []), refresh * 5)
   const profile = usePolled(useCallback(() => getProfile(), []), refresh * 5)
+  const inbox = usePolled(useCallback(() => getInbox(), []), refresh)
 
   const season = forced ?? seasonFor(clock)
   const start = nextSeasonStart(clock)
@@ -106,6 +113,26 @@ export function App() {
     void reloadProfile()
   }, [reloadProfile])
   const closeProfile = useCallback(() => setProfileOpen(false), [])
+
+  const reloadInbox = inbox.reload
+  const openInbox = useCallback(() => {
+    setInboxOpen(true)
+    void reloadInbox()
+  }, [reloadInbox])
+  const closeInbox = useCallback(() => setInboxOpen(false), [])
+  const seen = useCallback(
+    (ids: number[]) => {
+      void markRead(ids)
+        .catch(() => undefined)
+        .then(() => reloadInbox())
+    },
+    [reloadInbox],
+  )
+  const closeReward = useCallback(() => setRewardKey(null), [])
+  const distributed = useCallback(() => {
+    void reloadInbox()
+    void reloadProfile()
+  }, [reloadInbox, reloadProfile])
 
   const onMove = useCallback(
     async (key: string, lane: IssueRow['lane']) => {
@@ -151,6 +178,9 @@ export function App() {
         profile={profile.value?.data ?? null}
         profileError={profile.error}
         onOpenProfile={openProfile}
+        inboxCount={openCount(inbox.value?.messages ?? [])}
+        inboxError={inbox.error}
+        onOpenInbox={openInbox}
       />
 
       <Timer ask />
@@ -217,6 +247,20 @@ export function App() {
 
       {profileOpen ? (
         <ProfileWindow profile={profile.value?.data ?? null} error={profile.error} onClose={closeProfile} />
+      ) : null}
+
+      {inboxOpen ? (
+        <InboxWindow
+          inbox={inbox.value ?? null}
+          error={inbox.error}
+          onClose={closeInbox}
+          onOpenReward={setRewardKey}
+          onSeen={seen}
+        />
+      ) : null}
+
+      {rewardKey ? (
+        <RewardDialog questKey={rewardKey} onClose={closeReward} onDistributed={distributed} />
       ) : null}
 
       {questKey ? (

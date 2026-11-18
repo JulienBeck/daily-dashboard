@@ -90,6 +90,7 @@ export interface ProfileQuest {
   difficulty: Difficulty
   experience: number
   coins: Coins
+  share: number
   resolved: string | null
   webUrl: string
 }
@@ -100,6 +101,6 @@ export interface ProfilePayload {
   experience: number
   coins: Coins
   completed: number
-  counted: number
+  pending: { experience: number; coins: Coins; quests: number }
   quests: ProfileQuest[]
 }
