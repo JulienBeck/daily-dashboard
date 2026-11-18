@@ -1,7 +1,5 @@
 import type { BurndownPayload, BurndownPoint } from '../../shared/types.js'
-import { IconBurndown } from '../icons.js'
-
-const BOX = { width: 400, height: 116 }
+const BOX = { width: 400, height: 84 }
 const PAD = { left: 26, right: 10, top: 10, bottom: 16 }
 
 const PLOT = {
@@ -52,12 +50,36 @@ export function withNow(payload: BurndownPayload): BurndownPoint[] {
   return [...payload.points, { at: payload.now, remaining: last.remaining }]
 }
 
-export function Burndown({ payload }: { payload: BurndownPayload }) {
+export const unitOf = (payload: BurndownPayload) => (payload.unit === 'issues' ? '' : ' P')
+
+export function gapToIdeal(payload: BurndownPayload): { behind: number; ideal: number } | null {
+  const last = withNow(payload).at(-1)
+  const ideal = idealRemaining(payload, payload.now)
+  return ideal != null && last ? { behind: last.remaining - ideal, ideal } : null
+}
+
+export function BurndownGap({ payload }: { payload: BurndownPayload }) {
+  const gap = gapToIdeal(payload)
+  if (!gap) return null
+  const unit = unitOf(payload)
+  return (
+    <span
+      className={`num normal-case ${gap.behind > 0 ? 'text-serious' : 'text-good'}`}
+      title={`Ideallinie bei ${gap.ideal.toFixed(1)}${unit}`}
+    >
+      {gap.behind > 0 ? '+' : '−'}
+      {Math.abs(gap.behind).toFixed(1)}
+      {unit}
+    </span>
+  )
+}
+
+export function BurndownChart({ payload }: { payload: BurndownPayload }) {
   const start = Date.parse(payload.start)
   const end = Date.parse(payload.end)
   const span = end > start ? end - start : 1
   const top = maxScope(payload)
-  const unit = payload.unit === 'issues' ? '' : ' P'
+  const unit = unitOf(payload)
 
   const x = (at: string) => {
     const share = Math.min(1, Math.max(0, (Date.parse(at) - start) / span))
@@ -67,110 +89,92 @@ export function Burndown({ payload }: { payload: BurndownPayload }) {
     PLOT.bottom - Math.min(1, Math.max(0, value / top)) * (PLOT.bottom - PLOT.top)
 
   const series = withNow(payload)
-  const last = series[series.length - 1]
-  const ideal = idealRemaining(payload, payload.now)
-  const behind = ideal != null && last ? last.remaining - ideal : null
+  const last = series.at(-1)
+  const behind = gapToIdeal(payload)?.behind ?? null
+
+  if (!last) {
+    return <p className="text-[11px] text-serious">Keine Sprint-Historie von Jira bekommen</p>
+  }
 
   return (
-    <section className="panel">
-      <div className="panel-head">
-        <IconBurndown className="text-sm" />
-        <span className="flex-1">Burndown</span>
-        {behind != null ? (
-          <span
-            className={`num normal-case ${behind > 0 ? 'text-serious' : 'text-good'}`}
-            title={`Ideallinie bei ${ideal!.toFixed(1)}${unit}`}
-          >
-            {behind > 0 ? '+' : '−'}
-            {Math.abs(behind).toFixed(1)}
+    <div>
+      <svg
+        viewBox={`0 0 ${BOX.width} ${BOX.height}`}
+        className="h-auto w-full"
+        role="img"
+        aria-label={`Burndown: noch ${last.remaining}${unit} von ${payload.startScope}${unit}${
+          behind == null
+            ? ''
+            : behind > 0
+              ? `, ${behind.toFixed(1)}${unit} hinter der Ideallinie`
+              : `, ${Math.abs(behind).toFixed(1)}${unit} vor der Ideallinie`
+        }`}
+      >
+        <line
+          x1={PLOT.left}
+          y1={PLOT.bottom}
+          x2={PLOT.right}
+          y2={PLOT.bottom}
+          stroke="var(--rule)"
+          strokeWidth={1}
+        />
+        <line
+          x1={x(payload.start)}
+          y1={y(payload.startScope)}
+          x2={x(payload.end)}
+          y2={y(0)}
+          stroke="var(--step-2)"
+          strokeWidth={1.6}
+          strokeDasharray="5 4"
+          strokeLinecap="round"
+        />
+        <path
+          d={stepPath(series, x, y)}
+          fill="none"
+          stroke="var(--accent)"
+          strokeWidth={2.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle cx={x(last.at)} cy={y(last.remaining)} r={3.5} fill="var(--accent)" />
+
+        <text x={2} y={PLOT.top + 4} className="fill-muted text-[9px]">
+          {top}
+        </text>
+        <text x={2} y={PLOT.bottom + 3} className="fill-muted text-[9px]">
+          0
+        </text>
+        <text x={PLOT.left} y={BOX.height - 3} className="fill-muted text-[9px]">
+          {day.format(new Date(payload.start))}
+        </text>
+        <text x={PLOT.right} y={BOX.height - 3} textAnchor="end" className="fill-muted text-[9px]">
+          {day.format(new Date(payload.end))}
+        </text>
+      </svg>
+
+      <div className="flex items-center gap-3 text-[10px] text-muted">
+        <span className="flex items-center gap-1.5">
+          <i className="h-0.5 w-4 shrink-0 rounded-full bg-accent" />
+          Rest {last.remaining}
+          {unit}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <i
+            className="h-0.5 w-4 shrink-0"
+            style={{
+              backgroundImage:
+                'repeating-linear-gradient(to right, var(--step-2) 0 5px, transparent 5px 9px)',
+            }}
+          />
+          Ideal
+        </span>
+        {payload.scope !== payload.startScope ? (
+          <span className="num ml-auto" title="Sprint-Umfang hat sich geändert">
+            Scope {payload.startScope} → {payload.scope}
             {unit}
           </span>
         ) : null}
       </div>
-
-      {series.length === 0 ? (
-        <p className="text-[11px] text-serious">Keine Sprint-Historie von Jira bekommen</p>
-      ) : (
-        <>
-          <svg
-            viewBox={`0 0 ${BOX.width} ${BOX.height}`}
-            className="h-auto w-full"
-            role="img"
-            aria-label={`Burndown: noch ${last!.remaining}${unit} von ${payload.startScope}${unit}${
-              behind == null
-                ? ''
-                : behind > 0
-                  ? `, ${behind.toFixed(1)}${unit} hinter der Ideallinie`
-                  : `, ${Math.abs(behind).toFixed(1)}${unit} vor der Ideallinie`
-            }`}
-          >
-            <line
-              x1={PLOT.left}
-              y1={PLOT.bottom}
-              x2={PLOT.right}
-              y2={PLOT.bottom}
-              stroke="var(--rule)"
-              strokeWidth={1}
-            />
-            <line
-              x1={x(payload.start)}
-              y1={y(payload.startScope)}
-              x2={x(payload.end)}
-              y2={y(0)}
-              stroke="var(--step-2)"
-              strokeWidth={1.6}
-              strokeDasharray="5 4"
-              strokeLinecap="round"
-            />
-            <path
-              d={stepPath(series, x, y)}
-              fill="none"
-              stroke="var(--accent)"
-              strokeWidth={2.5}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <circle cx={x(last!.at)} cy={y(last!.remaining)} r={3.5} fill="var(--accent)" />
-
-            <text x={2} y={PLOT.top + 4} className="fill-muted text-[9px]">
-              {top}
-            </text>
-            <text x={2} y={PLOT.bottom + 3} className="fill-muted text-[9px]">
-              0
-            </text>
-            <text x={PLOT.left} y={BOX.height - 3} className="fill-muted text-[9px]">
-              {day.format(new Date(payload.start))}
-            </text>
-            <text x={PLOT.right} y={BOX.height - 3} textAnchor="end" className="fill-muted text-[9px]">
-              {day.format(new Date(payload.end))}
-            </text>
-          </svg>
-
-          <div className="mt-1 flex items-center gap-3 text-[10px] text-muted">
-            <span className="flex items-center gap-1.5">
-              <i className="h-0.5 w-4 shrink-0 rounded-full bg-accent" />
-              Rest {last!.remaining}
-              {unit}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <i
-                className="h-0.5 w-4 shrink-0"
-                style={{
-                  backgroundImage:
-                    'repeating-linear-gradient(to right, var(--step-2) 0 5px, transparent 5px 9px)',
-                }}
-              />
-              Ideal
-            </span>
-            {payload.scope !== payload.startScope ? (
-              <span className="num ml-auto" title="Sprint-Umfang hat sich geändert">
-                Scope {payload.startScope} → {payload.scope}
-                {unit}
-              </span>
-            ) : null}
-          </div>
-        </>
-      )}
-    </section>
+    </div>
   )
 }

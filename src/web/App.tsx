@@ -23,7 +23,6 @@ import {
 import { useLook } from './look.js'
 import { usePolled } from './usePolled.js'
 import { Ampel } from './components/Ampel.js'
-import { Burndown } from './components/Burndown.js'
 import { MergeRequests } from './components/MergeRequests.js'
 import { People } from './components/People.js'
 import { SeasonHeader } from './components/SeasonHeader.js'
@@ -148,12 +147,13 @@ export function App() {
         className="grid min-h-0 flex-1 gap-3"
         style={{ gridTemplateColumns: mrsCollapsed ? '4fr 8fr auto' : '3fr 6fr 3fr' }}
       >
-        <div className="grid min-h-0 grid-rows-[auto_auto_1fr] gap-3">
-          {sprint.value ? <SprintTile sprint={sprint.value.data.sprint} /> : null}
-          {burndown.error ? (
-            <Problem what="Burndown" message={burndown.error} />
-          ) : burndown.value ? (
-            <Burndown payload={burndown.value.data} />
+        <div className="grid min-h-0 grid-rows-[auto_1fr] gap-3">
+          {sprint.value ? (
+            <SprintTile
+              sprint={sprint.value.data.sprint}
+              burndown={burndown.value?.data ?? null}
+              burndownError={burndown.error}
+            />
           ) : null}
           <People
             team={board.value?.team ?? []}

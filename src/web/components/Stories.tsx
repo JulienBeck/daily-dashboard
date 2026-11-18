@@ -92,7 +92,7 @@ function Card({
         event.preventDefault()
         onOpen(issue.key)
       }}
-      className={`block rounded-lg border border-white/10 border-l-2 bg-card px-2.5 py-1.5 no-underline ${
+      className={`look-parchment block rounded-lg border border-white/10 border-l-2 bg-card px-2.5 py-1.5 no-underline ${
         done ? 'opacity-55' : ''
       } ${draggable ? 'cursor-grab active:cursor-grabbing' : ''} ${busy ? 'animate-pulse' : ''}`}
       style={{ borderLeftColor: done ? 'var(--rule)' : accent }}
@@ -192,7 +192,7 @@ export function Stories({
   }
 
   return (
-    <section className="look-parchment panel grid min-h-0 grid-rows-[auto_auto_1fr] border-t-2 border-t-accent">
+    <section className="panel grid min-h-0 grid-rows-[auto_auto_1fr] border-t-2 border-t-accent">
       <div className="panel-head">
         <IconBoard className="text-sm" />
         <span className="flex-1">Stories im Sprint</span>

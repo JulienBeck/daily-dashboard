@@ -1,5 +1,6 @@
-import type { SprintInfo } from '../../shared/types.js'
+import type { BurndownPayload, SprintInfo } from '../../shared/types.js'
 import { IconSprint } from '../icons.js'
+import { BurndownChart, BurndownGap } from './Burndown.js'
 
 const SEGMENTS = [
   { key: 'done' as const, label: 'erledigt', color: 'var(--step-1)' },
@@ -24,7 +25,15 @@ export function timeLeftShare(sprint: SprintInfo): number | null {
   return Math.min(100, Math.max(0, (sprint.workdaysLeft / sprint.workdaysTotal) * 100))
 }
 
-export function SprintTile({ sprint }: { sprint: SprintInfo }) {
+export function SprintTile({
+  sprint,
+  burndown = null,
+  burndownError = null,
+}: {
+  sprint: SprintInfo
+  burndown?: BurndownPayload | null
+  burndownError?: string | null
+}) {
   const widths = share(sprint.points)
   const left = timeLeftShare(sprint)
   const total = sprint.points.done + sprint.points.doing + sprint.points.open
@@ -35,11 +44,12 @@ export function SprintTile({ sprint }: { sprint: SprintInfo }) {
         <IconSprint className="text-sm" />
         <span className="flex-1">{sprint.name}</span>
         <span className="num normal-case">{total} P</span>
+        {burndown ? <BurndownGap payload={burndown} /> : null}
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <div
-          className="relative grid size-[88px] shrink-0 place-items-center rounded-full"
+          className="relative grid size-16 shrink-0 place-items-center rounded-full"
           style={{
             background:
               left == null
@@ -53,17 +63,17 @@ export function SprintTile({ sprint }: { sprint: SprintInfo }) {
               : `${sprint.workdaysLeft} von ${sprint.workdaysTotal} Arbeitstagen übrig`
           }
         >
-          <span className="absolute inset-[9px] rounded-full bg-surface" />
+          <span className="absolute inset-[7px] rounded-full bg-surface" />
           <span className="relative text-center leading-none">
-            <span className="num block text-[26px] font-bold tracking-tight">
+            <span className="num block text-[20px] font-bold tracking-tight">
               {sprint.workdaysLeft ?? '—'}
             </span>
-            <span className="mt-0.5 block text-[9px] tracking-wide text-muted uppercase">Tage</span>
+            <span className="block text-[8px] tracking-wide text-muted uppercase">Tage</span>
           </span>
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="mb-2 flex h-3 gap-0.5" role="img" aria-label="Story Points nach Zustand">
+          <div className="mb-1.5 flex h-2 gap-0.5" role="img" aria-label="Story Points nach Zustand">
             {SEGMENTS.map((segment, index) => (
               <div
                 key={segment.key}
@@ -77,10 +87,10 @@ export function SprintTile({ sprint }: { sprint: SprintInfo }) {
             ))}
           </div>
 
-          <dl className="grid gap-1 text-xs">
+          <dl className="grid gap-0.5 text-[11px]">
             {SEGMENTS.map((segment) => (
               <div key={segment.key} className="flex items-center gap-2 text-ink-2">
-                <i className="size-2.5 shrink-0 rounded-[3px]" style={{ background: segment.color }} />
+                <i className="size-2 shrink-0 rounded-[2px]" style={{ background: segment.color }} />
                 <dt>{segment.label}</dt>
                 <dd className="num ml-auto text-ink">{sprint.points[segment.key]} P</dd>
               </div>
@@ -90,10 +100,20 @@ export function SprintTile({ sprint }: { sprint: SprintInfo }) {
       </div>
 
       {total === 0 ? (
-        <p className="mt-2.5 border-t border-rule pt-2 text-[11px] text-serious">
+        <p className="mt-2 border-t border-rule pt-1.5 text-[11px] text-serious">
           Keine Story Points gefunden
           {sprint.pointsField ? ` (Feld ${sprint.pointsField})` : ' — kein Schätzfeld ermittelt'}
         </p>
+      ) : null}
+
+      {burndown || burndownError ? (
+        <div className="mt-2 border-t border-rule pt-1.5">
+          {burndownError ? (
+            <p className="text-[11px] text-serious">Burndown: {burndownError}</p>
+          ) : (
+            <BurndownChart payload={burndown!} />
+          )}
+        </div>
       ) : null}
     </section>
   )

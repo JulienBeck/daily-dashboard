@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import type { SprintInfo } from '../../shared/types.js'
+import type { BurndownPayload, SprintInfo } from '../../shared/types.js'
 import { share, SprintTile, timeLeftShare } from './SprintTile.js'
 
 const sprint: SprintInfo = {
@@ -78,5 +78,47 @@ describe('SprintTile', () => {
   it('stays quiet about the field as soon as points arrive', () => {
     render(<SprintTile sprint={sprint} />)
     expect(screen.queryByText(/Keine Story Points/)).not.toBeInTheDocument()
+  })
+
+  const burndown: BurndownPayload = {
+    sprintName: 'Sprint 42',
+    start: '2026-10-12T08:00:00.000Z',
+    end: '2026-10-22T08:00:00.000Z',
+    now: '2026-10-17T08:00:00.000Z',
+    points: [
+      { at: '2026-10-12T08:00:00.000Z', remaining: 16 },
+      { at: '2026-10-16T08:00:00.000Z', remaining: 5 },
+    ],
+    startScope: 16,
+    scope: 16,
+    unit: 'points',
+  }
+
+  it('carries the burndown in the same tile, gap in the heading', () => {
+    const { container } = render(<SprintTile sprint={sprint} burndown={burndown} />)
+
+    expect(container.querySelectorAll('section')).toHaveLength(1)
+    expect(screen.getByRole('img', { name: /^Burndown: noch 5 P/ })).toBeInTheDocument()
+    expect(screen.getByText('−3.0 P').closest('.panel-head')).not.toBeNull()
+  })
+
+  it('says why the burndown is missing instead of a tile of its own', () => {
+    render(<SprintTile sprint={sprint} burndownError="Burndown braucht jira.boardId" />)
+
+    expect(screen.getByText('Burndown: Burndown braucht jira.boardId')).toHaveClass('text-serious')
+    expect(screen.queryByRole('img', { name: /^Burndown/ })).not.toBeInTheDocument()
+  })
+
+  it('stays a plain sprint tile while no burndown has arrived', () => {
+    render(<SprintTile sprint={sprint} />)
+
+    expect(screen.queryByText(/Burndown/)).not.toBeInTheDocument()
+  })
+
+  it('puts the error before an old burndown, so a stale chart is not taken for news', () => {
+    render(<SprintTile sprint={sprint} burndown={burndown} burndownError="Jira antwortet nicht" />)
+
+    expect(screen.getByText('Burndown: Jira antwortet nicht')).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: /^Burndown/ })).not.toBeInTheDocument()
   })
 })

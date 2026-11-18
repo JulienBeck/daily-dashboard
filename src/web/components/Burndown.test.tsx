@@ -1,7 +1,15 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import type { BurndownPayload } from '../../shared/types.js'
-import { Burndown, idealRemaining, maxScope, stepPath, withNow } from './Burndown.js'
+import {
+  BurndownChart,
+  BurndownGap,
+  gapToIdeal,
+  idealRemaining,
+  maxScope,
+  stepPath,
+  withNow,
+} from './Burndown.js'
 
 const payload: BurndownPayload = {
   sprintName: 'Sprint 42',
@@ -91,46 +99,58 @@ describe('withNow', () => {
   })
 })
 
-describe('Burndown', () => {
-  it('names the gap to the ideal line in the heading', () => {
-    render(<Burndown payload={payload} />)
-    expect(screen.getByText('−3.0 P')).toBeInTheDocument()
+describe('gapToIdeal', () => {
+  it('measures how far the line is from the ideal today', () => {
+    expect(gapToIdeal(payload)).toEqual({ behind: -3, ideal: 8 })
+  })
+
+  it('has nothing to measure without history', () => {
+    expect(gapToIdeal({ ...payload, points: [] })).toBeNull()
+  })
+})
+
+describe('BurndownGap', () => {
+  it('names the gap to the ideal line', () => {
+    render(<BurndownGap payload={payload} />)
+    expect(screen.getByText('−3.0 P')).toHaveClass('text-good')
   })
 
   it('marks a sprint that is behind in the warning colour', () => {
-    render(<Burndown payload={{ ...payload, points: [{ at: payload.start, remaining: 16 }] }} />)
+    render(<BurndownGap payload={{ ...payload, points: [{ at: payload.start, remaining: 16 }] }} />)
     expect(screen.getByText('+8.0 P')).toHaveClass('text-serious')
   })
 
+  it('drops the unit when the board counts issues rather than points', () => {
+    render(<BurndownGap payload={{ ...payload, unit: 'issues' }} />)
+    expect(screen.getByText('−3.0')).toBeInTheDocument()
+  })
+})
+
+describe('BurndownChart', () => {
   it('spells the remaining work out in the chart label, not only in colour', () => {
-    render(<Burndown payload={payload} />)
+    render(<BurndownChart payload={payload} />)
     expect(screen.getByRole('img')).toHaveAccessibleName(
       'Burndown: noch 5 P von 16 P, 3.0 P vor der Ideallinie',
     )
   })
 
   it('labels both lines, so the dashed one is never guesswork', () => {
-    render(<Burndown payload={payload} />)
+    render(<BurndownChart payload={payload} />)
     expect(screen.getByText(/Rest 5/)).toBeInTheDocument()
     expect(screen.getByText('Ideal')).toBeInTheDocument()
   })
 
   it('shows the scope change only when the sprint actually grew', () => {
-    const { rerender } = render(<Burndown payload={payload} />)
+    const { rerender } = render(<BurndownChart payload={payload} />)
     expect(screen.queryByText(/Scope/)).not.toBeInTheDocument()
 
-    rerender(<Burndown payload={{ ...payload, scope: 18 }} />)
+    rerender(<BurndownChart payload={{ ...payload, scope: 18 }} />)
     expect(screen.getByText('Scope 16 → 18 P')).toBeInTheDocument()
   })
 
   it('says so instead of drawing an empty box when Jira has no history', () => {
-    render(<Burndown payload={{ ...payload, points: [] }} />)
+    render(<BurndownChart payload={{ ...payload, points: [] }} />)
     expect(screen.getByText(/Keine Sprint-Historie/)).toBeInTheDocument()
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
-  })
-
-  it('drops the unit when the board counts issues rather than points', () => {
-    render(<Burndown payload={{ ...payload, unit: 'issues' }} />)
-    expect(screen.getByText('−3.0')).toBeInTheDocument()
   })
 })
