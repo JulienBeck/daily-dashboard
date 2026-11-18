@@ -45,25 +45,31 @@ export function SeasonHeader({
   look,
   onToggleLook,
 }: Props) {
+  const framed = look === 'questlog'
   return (
-    <header className="panel grid grid-cols-[auto_auto_1fr_auto] items-center gap-5 border-l-[3px] border-l-accent py-2.5">
-      <div className="text-center">
-        <img
-          src={SEASON_ART[season.key]}
-          alt={season.label}
-          className="size-16 rounded-md"
-          width={64}
-          height={64}
-        />
-        <div className="mt-1 text-[10px] text-muted">{season.span}</div>
-        {preview ? <div className="text-[10px] text-accent">Vorschau</div> : null}
-      </div>
+    <header className={`panel grid ${framed ? 'grid-cols-[auto_1fr_auto]' : 'grid-cols-[auto_auto_1fr_auto]'} items-center gap-5 border-l-[3px] border-l-accent py-2.5`}>
+      {framed ? null : (
+        <div className="text-center">
+          <img
+            src={SEASON_ART[season.key]}
+            alt={season.label}
+            className="size-16 rounded-md"
+            width={64}
+            height={64}
+          />
+          <div className="mt-1 text-[10px] text-muted">{season.span}</div>
+          {preview ? <div className="text-[10px] text-accent">Vorschau</div> : null}
+        </div>
+      )}
 
       <div className="border-r border-rule pr-5 text-center">
         <div className="num text-[28px] leading-none font-semibold tracking-tight">
           {timeFormat.format(clock)}
         </div>
         <div className="mt-1 text-[11px] text-ink-2">{dateFormat.format(clock)}</div>
+        {framed && preview ? (
+          <div className="text-[10px] text-accent">Vorschau: {season.label}</div>
+        ) : null}
       </div>
 
       <Epics rows={epics} jql={epicsJql} error={epicsError} />
@@ -78,7 +84,7 @@ export function SeasonHeader({
         >
           Questlog-Look
         </button>
-        <div className="leading-snug">
+        <div className="leading-snug" title={`nächstes Theme: ${next.label}`}>
           <div className={`num flex items-center justify-end gap-1${reminder ? ' text-warning' : ''}`}>
             {reminder ? (
               <button
@@ -97,14 +103,16 @@ export function SeasonHeader({
           </div>
           <div>ab {shortDate.format(nextStart)}</div>
         </div>
-        <img
-          src={SEASON_ART[next.key]}
-          alt={next.label}
-          title={`nächstes Theme: ${next.label}`}
-          className="size-[42px] shrink-0 rounded-md"
-          width={42}
-          height={42}
-        />
+        {framed ? null : (
+          <img
+            src={SEASON_ART[next.key]}
+            alt={next.label}
+            title={`nächstes Theme: ${next.label}`}
+            className="size-[42px] shrink-0 rounded-md"
+            width={42}
+            height={42}
+          />
+        )}
       </div>
     </header>
   )

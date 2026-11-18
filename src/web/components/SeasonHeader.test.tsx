@@ -12,6 +12,7 @@ interface Over {
   onDismiss?: () => void
   look?: Look
   onToggleLook?: () => void
+  preview?: boolean
 }
 
 const header = (over: Over = {}) =>
@@ -23,7 +24,7 @@ const header = (over: Over = {}) =>
       daysLeft={over.daysLeft ?? 14}
       reminder={over.reminder ?? false}
       onDismiss={over.onDismiss ?? (() => undefined)}
-      preview={false}
+      preview={over.preview ?? false}
       clock={new Date(2027, 1, 8, 9, 0)}
       epics={[]}
       epicsJql={null}
@@ -90,5 +91,34 @@ describe('SeasonHeader', () => {
       'aria-pressed',
       'false',
     )
+  })
+
+  it('shows this and the next theme as pictures in the classic look', () => {
+    header()
+
+    expect(screen.getByRole('img', { name: 'Winter' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Frühling' })).toBeInTheDocument()
+  })
+
+  it('drops both theme pictures in the questlog look, the frames carry the season there', () => {
+    header({ look: 'questlog' })
+
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    expect(screen.getByText('noch 14 Arbeitstage').closest('[title]')).toHaveAttribute(
+      'title',
+      'nächstes Theme: Frühling',
+    )
+  })
+
+  it('still marks a forced season as preview in the questlog look', () => {
+    header({ look: 'questlog', preview: true })
+
+    expect(screen.getByText('Vorschau: Winter')).toBeInTheDocument()
+  })
+
+  it('names no season next to the clock without a preview', () => {
+    header({ look: 'questlog' })
+
+    expect(screen.queryByText(/Vorschau/)).not.toBeInTheDocument()
   })
 })

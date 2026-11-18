@@ -25,6 +25,7 @@ import { usePolled } from './usePolled.js'
 import { Ampel } from './components/Ampel.js'
 import { MergeRequests } from './components/MergeRequests.js'
 import { People } from './components/People.js'
+import { SeasonDecor } from './components/SeasonDecor.js'
 import { SeasonHeader } from './components/SeasonHeader.js'
 import { SprintTile } from './components/SprintTile.js'
 import { Stories } from './components/Stories.js'
@@ -200,6 +201,8 @@ export function App() {
           onRefresh={pipelines.reload}
         />
       )}
+
+      {look === 'questlog' ? <SeasonDecor season={season.key} /> : null}
 
       {questKey ? (
         <Suspense fallback={null}>
