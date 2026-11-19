@@ -64,13 +64,8 @@ export function SeasonHeader({
         {preview ? (
           <div className="text-[10px] text-accent">Vorschau: {season.label}</div>
         ) : null}
-      </div>
-
-      <Epics rows={epics} jql={epicsJql} error={epicsError} />
-
-      <div className="flex items-center gap-4 text-right text-[11px] text-muted">
-        <div className="leading-snug" title={`nächstes Theme: ${next.label}`}>
-          <div className={`num flex items-center justify-end gap-1${reminder ? ' text-warning' : ''}`}>
+        <div className="mt-1.5 border-t border-rule pt-1.5 text-[11px] leading-snug text-muted" title={`nächstes Theme: ${next.label}`}>
+          <div className={`num flex items-center justify-center gap-1${reminder ? ' text-warning' : ''}`}>
             {reminder ? (
               <button
                 type="button"
@@ -88,10 +83,13 @@ export function SeasonHeader({
           </div>
           <div>ab {shortDate.format(nextStart)}</div>
         </div>
-        <div className="flex gap-2">
-          <InboxButton count={inboxCount} error={inboxError} onOpen={onOpenInbox} />
-          <ProfileButton profile={profile} error={profileError} onOpen={onOpenProfile} />
-        </div>
+      </div>
+
+      <Epics rows={epics} jql={epicsJql} error={epicsError} />
+
+      <div className="flex gap-2">
+        <InboxButton count={inboxCount} error={inboxError} onOpen={onOpenInbox} />
+        <ProfileButton profile={profile} error={profileError} onOpen={onOpenProfile} />
       </div>
     </header>
   )

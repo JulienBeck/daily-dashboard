@@ -86,6 +86,12 @@ describe('SeasonHeader', () => {
     )
   })
 
+  it('counts the remaining workdays under the clock', () => {
+    header()
+
+    expect(screen.getByText('noch 14 Arbeitstage').closest('header > div')).toHaveTextContent('09:00')
+  })
+
   it('marks a forced season as preview under the clock', () => {
     header({ preview: true })
 
