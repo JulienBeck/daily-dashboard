@@ -28,7 +28,7 @@ import {
 } from './questlog/jira.js'
 import { postgres, retry } from './db.js'
 import { migrate } from './rewards/schema.js'
-import { createRewards, parseEquip, parseIds, parseShares, questOn, type Rewards } from './rewards/service.js'
+import { createRewards, parseBody, parseEquip, parseIds, parseShares, questOn, type Rewards } from './rewards/service.js'
 
 const config = loadConfig()
 const REWARD_SYNC_MS = 5 * 60_000
@@ -296,6 +296,8 @@ app.post<{ Body: unknown }>('/api/equipment', async (request) => {
   const { item, equipped } = parseEquip(request.body)
   return rewardsReady().equip(item, equipped)
 })
+
+app.post<{ Body: unknown }>('/api/body', async (request) => rewardsReady().chooseBody(parseBody(request.body)))
 
 app.get<{ Querystring: { q?: string } }>('/api/users', async (request) =>
   rewardsReady().users(request.query.q ?? ''),

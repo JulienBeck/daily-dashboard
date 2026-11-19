@@ -7,7 +7,7 @@ import { initialsOf, ProfileButton, ProfileWindow, Purse } from './Profile.js'
 vi.mock('../api.js')
 
 beforeEach(() => {
-  vi.mocked(api.getEquipment).mockResolvedValue({ items: [{ id: 'wool-hood', equipped: true }] })
+  vi.mocked(api.getEquipment).mockResolvedValue({ body: 'male', items: [{ id: 'wool-hood', equipped: true }] })
 })
 
 const profile = (over: Partial<ProfilePayload> = {}): ProfilePayload => ({

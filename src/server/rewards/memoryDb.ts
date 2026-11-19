@@ -8,13 +8,17 @@ const wrap = (target: PGlite | Transaction): Sql => ({
   }),
 })
 
-export async function memoryDb(): Promise<Db> {
+export function emptyDb(): Db {
   const lite = new PGlite()
-  const db: Db = {
+  return {
     ...wrap(lite),
     transaction: (work) => lite.transaction((tx) => work(wrap(tx))),
     close: () => lite.close(),
   }
+}
+
+export async function memoryDb(): Promise<Db> {
+  const db = emptyDb()
   await migrate(db)
   return db
 }

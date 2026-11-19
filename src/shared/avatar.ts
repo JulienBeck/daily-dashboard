@@ -35,7 +35,17 @@ export interface OwnedItem {
   equipped: boolean
 }
 
+export type Body = 'male' | 'female'
+
+export const BODIES: readonly { body: Body; label: string }[] = [
+  { body: 'male', label: 'Mann' },
+  { body: 'female', label: 'Frau' },
+]
+
+export const isBody = (value: unknown): value is Body => BODIES.some((entry) => entry.body === value)
+
 export interface EquipmentPayload {
+  body: Body
   items: OwnedItem[]
 }
 

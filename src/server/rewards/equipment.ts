@@ -1,4 +1,4 @@
-import type { OwnedItem } from '../../shared/avatar.js'
+import type { Body, OwnedItem } from '../../shared/avatar.js'
 import type { Person } from '../../shared/rewards.js'
 import type { Db, Sql } from '../db.js'
 
@@ -58,4 +58,13 @@ export async function setEquipped(
       equipped,
     ])
   })
+}
+
+export async function bodyOf(db: Sql, playerId: string): Promise<Body> {
+  const { rows } = await db.query<{ body: Body }>('select body from player where id = $1', [playerId])
+  return rows[0]?.body ?? 'male'
+}
+
+export async function setBody(db: Sql, playerId: string, body: Body): Promise<void> {
+  await db.query('update player set body = $2 where id = $1', [playerId, body])
 }

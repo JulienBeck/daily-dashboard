@@ -1,10 +1,10 @@
-import { type EquipmentPayload, itemById, sameSlot, STARTER } from '../../shared/avatar.js'
+import { type Body, type EquipmentPayload, isBody, itemById, sameSlot, STARTER } from '../../shared/avatar.js'
 import type { PagePayload, ProfilePayload, Quest, RewardState } from '../../shared/questlog/types.js'
 import type { InboxPayload, Person, RewardDraft, Weighted } from '../../shared/rewards.js'
 import type { Db } from '../db.js'
 import type { JiraConfig } from '../questlog/config.js'
 import type { JiraCredentials, JiraDeps } from '../questlog/jira.js'
-import { inventory, outfit, setEquipped } from './equipment.js'
+import { bodyOf, inventory, outfit, setBody, setEquipped } from './equipment.js'
 import { fetchMe, fetchQuestRecord, type Me, searchUsers } from './jira.js'
 import {
   distribute,
@@ -84,6 +84,10 @@ export function createRewards(setup: RewardsSetup) {
     return running
   }
 
+  async function dressed(playerId: string): Promise<EquipmentPayload> {
+    return { body: await bodyOf(db, playerId), items: await inventory(db, playerId) }
+  }
+
   async function stateOf(key: string): Promise<RewardState | undefined> {
     return (await rewardStates(db, [key]))[key]
   }
@@ -154,7 +158,14 @@ export function createRewards(setup: RewardsSetup) {
     async equipment(): Promise<EquipmentPayload> {
       const user = await currentUser()
       await outfit(db, user, STARTER, deps.now())
-      return { items: await inventory(db, user.id) }
+      return dressed(user.id)
+    },
+
+    async chooseBody(body: Body): Promise<EquipmentPayload> {
+      const user = await currentUser()
+      await outfit(db, user, STARTER, deps.now())
+      await setBody(db, user.id, body)
+      return dressed(user.id)
     },
 
     async equip(itemId: string, equipped: boolean): Promise<EquipmentPayload> {
@@ -162,7 +173,7 @@ export function createRewards(setup: RewardsSetup) {
       const user = await currentUser()
       await outfit(db, user, STARTER, deps.now())
       await setEquipped(db, user.id, itemId, sameSlot(itemId), equipped)
-      return { items: await inventory(db, user.id) }
+      return dressed(user.id)
     },
 
     users(query: string): Promise<Person[]> {
@@ -194,4 +205,10 @@ export function parseEquip(raw: unknown): { item: string; equipped: boolean } {
   if (typeof item !== 'string' || !item) throw new Error('Ausrüstung: Gegenstand fehlt')
   if (typeof equipped !== 'boolean') throw new Error('Ausrüstung: anlegen oder ablegen?')
   return { item, equipped }
+}
+
+export function parseBody(raw: unknown): Body {
+  const { body } = (raw ?? {}) as Record<string, unknown>
+  if (!isBody(body)) throw new Error('Körperbau: Mann oder Frau?')
+  return body
 }

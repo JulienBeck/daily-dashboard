@@ -8,6 +8,7 @@ import {
   dueDate,
   FALLBACK_DUE_DAYS,
   parseIds,
+  parseBody,
   parseEquip,
   parseShares,
   questOn,
@@ -358,6 +359,14 @@ describe('users', () => {
   })
 })
 
+describe('parseBody', () => {
+  it('knows only the two body types', () => {
+    expect(parseBody({ body: 'female' })).toBe('female')
+    expect(() => parseBody({ body: 'troll' })).toThrow('Körperbau')
+    expect(() => parseBody(null)).toThrow('Körperbau')
+  })
+})
+
 describe('parseEquip', () => {
   it('wants an item and whether to put it on', () => {
     expect(parseEquip({ item: 'iron-helm', equipped: true })).toEqual({ item: 'iron-helm', equipped: true })
@@ -384,6 +393,15 @@ describe('equipment', () => {
 
     expect(result.items.find((item) => item.id === 'iron-helm')?.equipped).toBe(true)
     expect(result.items.find((item) => item.id === 'wool-hood')?.equipped).toBe(false)
+  })
+
+  it('starts every player as a man and remembers another body type', async () => {
+    const { rewards } = setup({ me: anna })
+
+    expect((await rewards.equipment()).body).toBe('male')
+    expect((await rewards.chooseBody('female')).body).toBe('female')
+    expect((await rewards.equipment()).body).toBe('female')
+    expect((await rewards.equip('iron-helm', true)).body).toBe('female')
   })
 
   it('refuses an item that does not exist', async () => {

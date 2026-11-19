@@ -13,7 +13,7 @@ const items = [
 
 beforeEach(() => {
   vi.resetAllMocks()
-  vi.mocked(api.getEquipment).mockResolvedValue({ items })
+  vi.mocked(api.getEquipment).mockResolvedValue({ body: 'male', items })
 })
 
 const sheet = async () => {
@@ -51,6 +51,7 @@ describe('CharacterSheet', () => {
 
   it('swaps the item and redraws the figure', async () => {
     vi.mocked(api.setEquipped).mockResolvedValue({
+      body: 'male',
       items: [
         { id: 'wool-hood', equipped: false },
         { id: 'iron-helm', equipped: true },
@@ -67,7 +68,7 @@ describe('CharacterSheet', () => {
   })
 
   it('takes an item off', async () => {
-    vi.mocked(api.setEquipped).mockResolvedValue({ items: items.map((item) => ({ ...item, equipped: false })) })
+    vi.mocked(api.setEquipped).mockResolvedValue({ body: 'male', items: items.map((item) => ({ ...item, equipped: false })) })
     await sheet()
     fireEvent.click(screen.getByRole('button', { name: 'Waffe rechts: Kurzschwert' }))
 

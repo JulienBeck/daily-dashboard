@@ -1,6 +1,6 @@
-import type { Sql } from '../db.js'
+import type { Db } from '../db.js'
 
-export const SCHEMA = [
+const BASELINE = [
   `create table if not exists player (
     id text primary key,
     name text not null,
@@ -55,6 +55,48 @@ export const SCHEMA = [
   )`,
 ]
 
-export async function migrate(db: Sql): Promise<void> {
-  for (const statement of SCHEMA) await db.query(statement)
+export interface Migration {
+  version: number
+  name: string
+  statements: readonly string[]
+}
+
+export const MIGRATIONS: readonly Migration[] = [
+  { version: 1, name: 'baseline', statements: BASELINE },
+  {
+    version: 2,
+    name: 'player body',
+    statements: [
+      `alter table player add column if not exists body text not null default 'male'
+         check (body in ('male', 'female'))`,
+    ],
+  },
+]
+
+const LOCK = 7_420_001
+
+export async function migrate(db: Db, migrations: readonly Migration[] = MIGRATIONS): Promise<number[]> {
+  await db.query(
+    `create table if not exists schema_migration (
+      version integer primary key,
+      name text not null,
+      applied_at timestamptz not null default now()
+    )`,
+  )
+  const applied: number[] = []
+  for (const migration of [...migrations].sort((a, b) => a.version - b.version)) {
+    const ran = await db.transaction(async (tx) => {
+      await tx.query('select pg_advisory_xact_lock($1)', [LOCK])
+      const { rows } = await tx.query('select 1 from schema_migration where version = $1', [migration.version])
+      if (rows.length > 0) return false
+      for (const statement of migration.statements) await tx.query(statement)
+      await tx.query('insert into schema_migration (version, name) values ($1, $2)', [
+        migration.version,
+        migration.name,
+      ])
+      return true
+    })
+    if (ran) applied.push(migration.version)
+  }
+  return applied
 }
