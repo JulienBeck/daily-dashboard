@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
+  type Body,
+  BODIES,
   type ItemDef,
   itemById,
   ITEMS,
@@ -10,8 +12,9 @@ import {
   slotLabel,
   worn,
 } from '../../../shared/avatar.js'
-import { getEquipment, setEquipped } from '../../api.js'
-import { Figure, ItemIcon } from './Figure.js'
+import { getEquipment, setBody, setEquipped } from '../../api.js'
+import { ItemIcon } from './ItemIcon.js'
+import { Stage } from './Stage.js'
 
 function SlotButton({
   slot,
@@ -35,7 +38,7 @@ function SlotButton({
       className="metal-button size-[54px] p-0.5 aria-pressed:outline-2 aria-pressed:outline-offset-1 aria-pressed:outline-accent"
       style={item ? { boxShadow: `inset 0 0 0 2px ${QUALITY[item.quality].colour}, 0 2px 4px rgba(0,0,0,0.8)` } : undefined}
     >
-      <ItemIcon slot={slot} item={item ?? ghost(slot)} faded={!item} />
+      <ItemIcon item={item ?? ghost(slot)} faded={!item} />
     </button>
   )
 }
@@ -44,6 +47,7 @@ const ghost = (slot: Slot) => ITEMS.find((item) => item.slot === slot)
 
 export function CharacterSheet({ name }: { name: string }) {
   const [items, setItems] = useState<OwnedItem[] | null>(null)
+  const [body, setBodyState] = useState<Body>('male')
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<Slot | null>(null)
   const [busy, setBusy] = useState(false)
@@ -51,7 +55,11 @@ export function CharacterSheet({ name }: { name: string }) {
   useEffect(() => {
     let live = true
     getEquipment()
-      .then((payload) => live && setItems(payload.items))
+      .then((payload) => {
+        if (!live) return
+        setItems(payload.items)
+        setBodyState(payload.body)
+      })
       .catch((reason: unknown) => live && setError(reason instanceof Error ? reason.message : String(reason)))
     return () => {
       live = false
@@ -65,17 +73,20 @@ export function CharacterSheet({ name }: { name: string }) {
         .filter((entry): entry is { owned: OwnedItem; item: ItemDef } => entry.item?.slot === selected)
     : []
 
-  const change = async (id: string, equipped: boolean) => {
+  const save = async (request: () => Promise<{ body: Body; items: OwnedItem[] }>) => {
     setBusy(true)
     setError(null)
     try {
-      setItems((await setEquipped(id, equipped)).items)
+      const payload = await request()
+      setItems(payload.items)
+      setBodyState(payload.body)
     } catch (reason: unknown) {
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally {
       setBusy(false)
     }
   }
+  const change = (id: string, equipped: boolean) => save(() => setEquipped(id, equipped))
 
   const column = (side: 'left' | 'right' | 'bottom') =>
     SLOTS.filter((entry) => entry.column === side).map(({ slot }) => (
@@ -90,10 +101,25 @@ export function CharacterSheet({ name }: { name: string }) {
 
   return (
     <section aria-label="Ausrüstung" className="grid content-start gap-3">
+      <div role="radiogroup" aria-label="Körperbau" className="flex justify-center gap-2">
+        {BODIES.map((entry) => (
+          <button
+            key={entry.body}
+            type="button"
+            role="radio"
+            aria-checked={body === entry.body}
+            disabled={busy || !items}
+            onClick={() => body !== entry.body && void save(() => setBody(entry.body))}
+            className="metal-button h-7 px-3 text-[12px] disabled:opacity-50 aria-checked:outline-2 aria-checked:outline-offset-1 aria-checked:outline-accent"
+          >
+            {entry.label}
+          </button>
+        ))}
+      </div>
       <div className="grid grid-cols-[auto_minmax(0,240px)_auto] items-center justify-center gap-2">
         <div className="grid gap-2.5">{column('left')}</div>
         <div className="h-[340px] min-w-0">
-          <Figure worn={wearing} title={`Spielfigur von ${name}`} />
+          <Stage body={body} worn={wearing} title={`Spielfigur von ${name}`} />
         </div>
         <div className="grid gap-2.5">{column('right')}</div>
       </div>
@@ -115,7 +141,7 @@ export function CharacterSheet({ name }: { name: string }) {
                   className="parchment grid grid-cols-[2.25rem_1fr_auto] items-center gap-3 rounded-md border border-white/10 px-2 py-1"
                 >
                   <span className="size-9">
-                    <ItemIcon slot={item.slot} item={item} />
+                    <ItemIcon item={item} />
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-[13px]" style={{ color: 'var(--ink)' }}>

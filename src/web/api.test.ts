@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getMergeRequests, getPipelines } from './api.js'
+import { getMergeRequests, getPipelines, setBody } from './api.js'
 
 const ok = (body: unknown) =>
   vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(body) })
@@ -36,6 +36,16 @@ describe('api', () => {
     await getMergeRequests()
 
     expect(calledUrl(fetch)).toMatch(/\/api\/mrs$/)
+  })
+
+  it('posts the chosen body to the body endpoint', async () => {
+    const fetch = ok({ body: 'female', items: [] })
+    vi.stubGlobal('fetch', fetch)
+
+    await expect(setBody('female')).resolves.toEqual({ body: 'female', items: [] })
+
+    expect(calledUrl(fetch)).toMatch(/\/api\/body$/)
+    expect(fetch.mock.calls[0]![1]).toMatchObject({ method: 'POST', body: JSON.stringify({ body: 'female' }) })
   })
 
   it('carries the proxy message into the thrown error', async () => {

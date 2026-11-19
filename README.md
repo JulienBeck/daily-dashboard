@@ -487,13 +487,15 @@ vergibt sonst Quests im Namen des Token-Besitzers.
 Oben rechts sitzen zwei Knöpfe: der **Posteingang** (Umschlag, rote Zahl = Neues) und das
 **Profil** (Jira-Bild). Beides braucht Postgres: `DATABASE_URL` in der `.env`, im Container
 setzt Compose sie selbst. Ohne Datenbank antworten beide mit einem Fehler im Tooltip, der Rest des
-Boards läuft weiter. Das Schema legt der Proxy beim Start an (`src/server/rewards/schema.ts`).
+Boards läuft weiter. Das Schema bringt der Proxy beim Start selbst auf Stand: versionierte
+Migrationen in `src/server/rewards/schema.ts`, je eine Transaktion, festgehalten in
+`schema_migration`. Ein Advisory-Lock verhindert, dass zwei Replicas gleichzeitig migrieren.
 
 **Wer bekommt die Belohnung einer Quest?** Der Questgeber (Reporter in Jira) entscheidet:
 
 | Schritt | Was passiert |
 |---|---|
-| Quest erledigt | Der Proxy schaut alle 5 Minuten (und sofort nach Annehmen, Abgeben, Verschieben) auf die Buchseiten. Jede neu erledigte Quest wird mit ihren Beteiligten abgelegt |
+| Quest abgegeben | Nur die Abgabe im Questlog zählt. Sie zieht den Jira-Task auf erledigt und legt die Quest mit ihren Beteiligten ab, eine Quest nur einmal. Direkt in Jira erledigte Quests bringen nichts |
 | Beteiligte | aus dem Jira-Changelog: wer wie lange zugewiesen war. Der Vorschlag ist anteilig nach dieser Zeit |
 | Posteingang des Questgebers | Nachricht „Verteilen“. Im Dialog Anteile per Regler verschieben, Personen aus Jira dazusuchen oder entfernen, „Gleich verteilen“ |
 | Verteilt | XP und Münzen gehen auf die Konten (`player`), jeder Bedachte bekommt eine Nachricht unter „Erhalten“ |
@@ -502,10 +504,8 @@ Boards läuft weiter. Das Schema legt der Proxy beim Start an (`src/server/rewar
 Gerundet wird nach größtem Rest — die Summe der Anteile ist immer genau die Belohnung der Quest,
 im Dialog wie auf dem Server (`split` in `src/shared/rewards.ts`).
 
-**Stichtag.** Beim ersten Lauf merkt sich die Datenbank den Beginn des laufenden Sprints
-(`setting.cutoff`, ändert sich danach nie). Was davor erledigt wurde, gilt nach der alten Regel:
-die volle Belohnung an den Bearbeiter. Diese Quests bucht der Proxy einmalig, wenn jemand zum
-ersten Mal sein Profil öffnet.
+**Abbrechen.** Gibt die Quest zurück: Status wieder offen, Zuweisung weg. Nach der Abgabe zieht
+Abbrechen auch die noch nicht verteilte Belohnung zurück, der Dialog warnt davor. Verteiltes bleibt.
 
 **Wer ist „ich“?** Bis es eine Anmeldung gibt, der Besitzer des `JIRA_TOKEN`. Verteilen darf nur,
 wer als Reporter der Quest eingetragen ist; der Posteingang zeigt also vorerst nur Quests, die
@@ -513,21 +513,44 @@ der Token-Besitzer selbst vergeben hat.
 
 | Tabelle | Inhalt |
 |---|---|
-| `player` | Konto je Jira-Benutzer: XP und Münzen in Kupfer, Zeitpunkt des Altbestand-Imports |
-| `quest` | erledigte Quest mit Belohnung, Questgeber, Frist und wann/von wem verteilt (`auto`, `legacy` oder Benutzer) |
+| `player` | Konto je Jira-Benutzer: XP und Münzen in Kupfer, Körperbau der Spielfigur |
+| `quest` | abgegebene Quest mit Belohnung, Questgeber, Frist und wann/von wem verteilt (`auto` oder Benutzer) |
 | `share` | Beteiligte je Quest: vorgeschlagener Anteil und, nach dem Verteilen, ihre XP und Münzen |
 | `message` | Posteingang: `distribute` für den Questgeber, `reward` für die Bedachten |
-| `setting` | `cutoff` |
+| `setting` | frei für Einstellungen, derzeit leer |
 | `inventory` | Ausrüstung je Spieler: Gegenstand und ob er angelegt ist |
 
 **Spielfigur.** Links im Profil steht die Figur mit acht Plätzen: Kopf, Schultern, Brust, Hände,
 Beine, Füße, Waffe rechts und links. Ein Klick auf einen Platz zeigt, was dafür im Gepäck liegt —
-anlegen tauscht den Gegenstand im selben Platz, ablegen lässt ihn leer. Figur und Gegenstände sind
-SVG (`src/web/components/avatar/Figure.tsx`), die leichte Bewegung ist CSS in `src/web/frames.css`
-und steht still, wenn das System reduzierte Bewegung verlangt. Der Katalog liegt in
-`src/shared/avatar.ts`; jeder Spieler bekommt beim ersten Öffnen einmal die Grundausrüstung
-(gewöhnlich, angelegt) und eine zweite Garnitur (ungewöhnlich, im Gepäck). Kaufen mit Münzen
-kommt später.
+anlegen tauscht den Gegenstand im selben Platz, ablegen lässt ihn leer. Darüber wählt man den
+Körperbau (Mann oder Frau). Der Katalog liegt in `src/shared/avatar.ts`; jeder Spieler bekommt beim
+ersten Öffnen einmal die Grundausrüstung (gewöhnlich, angelegt) und eine zweite Garnitur
+(ungewöhnlich, im Gepäck). Kaufen mit Münzen kommt später.
+
+Die Figur ist 3D (three.js, erst beim Öffnen des Profils geladen) und lässt sich mit der Maus
+drehen. Sie atmet leicht und steht still, wenn das System reduzierte Bewegung verlangt. Je
+Körperbau gibt es ein GLB mit Skelett, Idle-Animation und allen 16 Gegenständen als eigene Meshes
+(`item_<id>`); angezeigt wird, was angelegt ist. Die Farben kommen zur Laufzeit aus dem Katalog
+(Materialien `<id>.primary` und `<id>.secondary`). Die Icons der Plätze sind ein Sprite-Sheet aus
+demselben Lauf.
+
+| Datei | Inhalt |
+|---|---|
+| `tools/avatar/build.py` | Blender-Skript: Grundkörper aus MPFB2 (MakeHuman), Kleidung als Schale über der Haut, Rüstung und Waffen als eigene Meshes am Skelett, Export, Icons |
+| `tools/avatar/build.sh` | baut alle drei Assets nach `src/web/components/avatar/assets/` |
+| `src/web/components/avatar/scene.ts` | three.js-Bühne: Licht, Kamera, Animation, Drehen |
+| `src/web/components/avatar/wardrobe.ts` | welche Meshes sichtbar sind, welche Farbe ein Material bekommt |
+
+Neu bauen, etwa nach einem neuen Gegenstand im Katalog (jeder Gegenstand braucht dazu eine
+Bauanleitung in `Wardrobe.BUILDERS`):
+
+```sh
+BLENDER=/pfad/zu/blender tools/avatar/build.sh
+```
+
+Gebraucht werden Blender 4.5 LTS, das Addon MPFB2 und das Asset-Pack „makehuman_system_assets“
+(Haut, Augen, Haare) im MPFB-Datenordner. Der Code von MPFB steht unter GPL, seine Assets und
+die erzeugten Modelle unter CC0.
 
 Die Tests laufen gegen ein echtes Postgres in WASM (PGlite, `src/server/rewards/memoryDb.ts`) —
 kein Docker nötig.

@@ -10,7 +10,7 @@ import type {
   SprintInfo,
   TeamMember,
 } from '../shared/types.js'
-import type { EquipmentPayload } from '../shared/avatar.js'
+import type { Body, EquipmentPayload } from '../shared/avatar.js'
 import type { ProfilePayload } from '../shared/questlog/types.js'
 import type { InboxPayload, Person, RewardDraft, Weighted } from '../shared/rewards.js'
 
@@ -64,6 +64,7 @@ export const distributeReward = (key: string, shares: Weighted[]) =>
 export const getEquipment = () => get<EquipmentPayload>('/equipment')
 export const setEquipped = (item: string, equipped: boolean) =>
   post<EquipmentPayload>('/equipment', { item, equipped })
+export const setBody = (body: Body) => post<EquipmentPayload>('/body', { body })
 export const searchUsers = (query: string) => get<Person[]>(`/users?q=${encodeURIComponent(query)}`)
 
 export const moveIssue = (key: string, lane: IssueRow['lane']) =>
