@@ -26,26 +26,8 @@ export interface QuestRecord {
   shares: Weighted[]
 }
 
-export type LegacyQuest = Omit<QuestRecord, 'giver' | 'dueAt' | 'shares'>
-
 const iso = (value: unknown) => new Date(value as string).toISOString()
 const isoOrNull = (value: unknown) => (value == null ? null : iso(value))
-
-export async function setting(db: Sql, key: string): Promise<string | null> {
-  const { rows } = await db.query<{ value: string }>('select value from setting where key = $1', [key])
-  return rows[0]?.value ?? null
-}
-
-export async function settleSetting(db: Sql, key: string, value: string): Promise<string> {
-  await db.query('insert into setting (key, value) values ($1, $2) on conflict (key) do nothing', [key, value])
-  return (await setting(db, key)) ?? value
-}
-
-export async function knownKeys(db: Sql, keys: readonly string[]): Promise<Set<string>> {
-  if (keys.length === 0) return new Set()
-  const { rows } = await db.query<{ key: string }>('select key from quest where key = any($1)', [keys])
-  return new Set(rows.map((row) => row.key))
-}
 
 export async function rewardStates(db: Sql, keys: readonly string[]): Promise<Record<string, RewardState>> {
   if (keys.length === 0) return {}
@@ -283,47 +265,6 @@ export async function markRead(db: Sql, me: Person, ids: readonly number[], now:
     'update message set read_at = coalesce(read_at, $3) where recipient_id = $1 and id = any($2)',
     [me.id, ids, now],
   )
-}
-
-export async function isOpened(db: Sql, id: string): Promise<boolean> {
-  const { rows } = await db.query('select 1 from player where id = $1 and opened_at is not null', [id])
-  return rows.length > 0
-}
-
-export async function openPlayer(
-  db: Db,
-  person: Person,
-  legacy: readonly LegacyQuest[],
-  now: Date,
-): Promise<void> {
-  await db.transaction(async (tx) => {
-    await ensurePlayer(tx, person)
-    const { rows } = await tx.query<{ opened_at: unknown }>(
-      'select opened_at from player where id = $1 for update',
-      [person.id],
-    )
-    if (rows[0]?.opened_at != null) return
-    for (const quest of legacy) {
-      const inserted = await tx.query(
-        `insert into quest (key, title, web_url, difficulty, experience, copper, completed_at, due_at, distributed_at, distributed_by)
-         values ($1, $2, $3, $4, $5, $6, $7, $7, $7, 'legacy')
-         on conflict (key) do nothing
-         returning key`,
-        [quest.key, quest.title, quest.webUrl, quest.difficulty, quest.experience, quest.copper, quest.completedAt],
-      )
-      if (inserted.rows.length === 0) continue
-      await tx.query(
-        'insert into share (quest_key, player_id, proposed, experience, copper) values ($1, $2, 1, $3, $4)',
-        [quest.key, person.id, quest.experience, quest.copper],
-      )
-      await tx.query('update player set experience = experience + $2, copper = copper + $3 where id = $1', [
-        person.id,
-        quest.experience,
-        quest.copper,
-      ])
-    }
-    await tx.query('update player set opened_at = $2 where id = $1', [person.id, now])
-  })
 }
 
 export async function profile(db: Sql, me: Person, avatar: string | null): Promise<ProfilePayload> {

@@ -1,18 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Quest } from '../../shared/questlog/types.js'
 import type { JiraConfig } from '../questlog/config.js'
-import type { JiraIssue } from '../questlog/jira.js'
-import {
-  fetchLegacy,
-  fetchMe,
-  fetchQuestRecord,
-  LEGACY_LIMIT,
-  LEGACY_PAGE,
-  legacyJql,
-  legacyOf,
-  searchUsers,
-  USER_LIMIT,
-} from './jira.js'
+import { fetchMe, fetchQuestRecord, searchUsers, USER_LIMIT } from './jira.js'
 
 const jira: JiraConfig = {
   baseUrl: 'https://jira.test',
@@ -53,19 +42,6 @@ const quest = (over: Partial<Quest> = {}): Quest => ({
   ...over,
 })
 
-const story = (n: number, over: Record<string, unknown> = {}): JiraIssue => ({
-  key: `PRO-${n}`,
-  fields: {
-    summary: `Story ${n}`,
-    status: { name: 'Done', statusCategory: { key: 'done' } },
-    priority: { name: 'Medium' },
-    issuetype: { name: 'Story' },
-    customfield_1: 2,
-    resolutiondate: '2026-10-02T10:00:00.000+0200',
-    ...over,
-  },
-})
-
 function fake(answer: (url: URL) => unknown, flavor: 'server' | 'cloud' = 'server') {
   const calls: URL[] = []
   const fetch = (async (input: string | URL | Request) => {
@@ -97,60 +73,6 @@ describe('fetchMe', () => {
     const { deps, config } = fake(() => ({}))
 
     await expect(fetchMe(config, credentials, deps)).rejects.toThrow('kein Benutzer')
-  })
-})
-
-describe('legacyJql', () => {
-  it('asks for the caller’s quests finished before the cutoff', () => {
-    expect(legacyJql({ doneStatusCategories: ['done', 'closed'] }, new Date(2026, 10, 4, 9, 5))).toBe(
-      'assignee = currentUser() AND statusCategory in (done, closed) AND resolutiondate < "2026-11-04 09:05" ORDER BY resolutiondate DESC',
-    )
-  })
-})
-
-describe('legacyOf', () => {
-  it('books the full reward with the day it was finished', () => {
-    expect(legacyOf(quest(), '2026-10-02T08:00:00.000Z')).toEqual({
-      key: 'PRO-1',
-      title: 'Index nachts neu bauen',
-      webUrl: 'https://jira.test/browse/PRO-1',
-      difficulty: 'easy',
-      experience: 450,
-      copper: 9400,
-      completedAt: new Date('2026-10-02T08:00:00.000Z'),
-    })
-  })
-})
-
-describe('fetchLegacy', () => {
-  it('pages through the old quests, keeps the finishing day and leaves epics out', async () => {
-    const first = Array.from({ length: LEGACY_PAGE }, (_, i) => story(i + 1))
-    const second = [story(500), story(501, { issuetype: { name: 'Epic' } })]
-    const { calls, deps, config } = fake((url) =>
-      url.pathname.endsWith('/search')
-        ? { issues: Number(url.searchParams.get('startAt')) === 0 ? first : second, total: LEGACY_PAGE + 2 }
-        : undefined,
-    )
-
-    const legacy = await fetchLegacy(config, null, credentials, deps, new Date(2026, 10, 4))
-
-    const searches = calls.filter((url) => url.pathname.endsWith('/search'))
-    expect(searches.map((url) => url.searchParams.get('startAt'))).toEqual(['0', String(LEGACY_PAGE)])
-    expect(searches[0]!.searchParams.get('jql')).toContain('resolutiondate < "2026-11-04 00:00"')
-    expect(searches[0]!.searchParams.get('fields')?.split(',')).toContain('resolutiondate')
-    expect(legacy).toHaveLength(LEGACY_PAGE + 1)
-    expect(legacy[0]).toMatchObject({ key: 'PRO-1', experience: 300, completedAt: new Date('2026-10-02T08:00:00.000Z') })
-  })
-
-  it('stops at the limit instead of walking a whole Jira history', async () => {
-    const full = Array.from({ length: LEGACY_PAGE }, (_, i) => story(i + 1))
-    const { calls, deps, config } = fake((url) =>
-      url.pathname.endsWith('/search') ? { issues: full, total: LEGACY_LIMIT * 5 } : undefined,
-    )
-
-    await fetchLegacy(config, null, credentials, deps, new Date())
-
-    expect(calls.filter((url) => url.pathname.endsWith('/search'))).toHaveLength(LEGACY_LIMIT / LEGACY_PAGE)
   })
 })
 

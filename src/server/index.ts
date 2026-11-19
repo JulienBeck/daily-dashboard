@@ -17,7 +17,7 @@ import {
   moveIssue,
   setIssueWeek,
 } from './jira.js'
-import { pageById } from './questlog/config.js'
+import { type PageConfig, pageById } from './questlog/config.js'
 import {
   abandonQuest,
   acceptQuest,
@@ -28,7 +28,7 @@ import {
 } from './questlog/jira.js'
 import { postgres, retry } from './db.js'
 import { migrate } from './rewards/schema.js'
-import { createRewards, parseEquip, parseIds, parseShares, type Rewards } from './rewards/service.js'
+import { createRewards, parseEquip, parseIds, parseShares, questOn, type Rewards } from './rewards/service.js'
 
 const config = loadConfig()
 const REWARD_SYNC_MS = 5 * 60_000
@@ -212,6 +212,11 @@ const questlogPage = (id: string) => {
   return page!
 }
 
+const pagePayload = (page: PageConfig) =>
+  cache.get(`questlog:${page.id}`, config.questlog.cacheSeconds.jira, () =>
+    fetchPage(config.questlog.jira, page, jiraCredentials, deps),
+  )
+
 function forgetQuestlogPages() {
   for (const page of config.questlog.pages) cache.invalidate(`questlog:${page.id}`)
   cache.invalidate('profile')
@@ -241,18 +246,8 @@ const rewards: Rewards | null = db
   ? createRewards({
       db,
       jira: config.questlog.jira,
-      boardId: config.questlog.pages.find((page) => page.boardId != null)?.boardId ?? null,
       credentials: jiraCredentials,
       deps,
-      pages: async () =>
-        Promise.all(
-          config.questlog.pages.map(async (page) => {
-            const payload = await cache.get(`questlog:${page.id}`, config.questlog.cacheSeconds.jira, () =>
-              fetchPage(config.questlog.jira, page, jiraCredentials, deps),
-            )
-            return payload.data
-          }),
-        ),
       sprint: async () => {
         if (config.jira.boardId == null) return null
         const payload = await cache.get('sprint', config.cacheSeconds.jira, () =>
@@ -307,10 +302,7 @@ app.get<{ Querystring: { q?: string } }>('/api/users', async (request) =>
 )
 
 app.get<{ Params: { id: string } }>('/api/questlog/pages/:id', async (request) => {
-  const page = questlogPage(request.params.id)
-  const payload = await cache.get(`questlog:${page.id}`, config.questlog.cacheSeconds.jira, () =>
-    fetchPage(config.questlog.jira, page, jiraCredentials, deps),
-  )
+  const payload = await pagePayload(questlogPage(request.params.id))
   if (!rewards) return payload
   const stamped = await rewards.stamp(payload.data).catch((error: unknown) => {
     app.log.warn(error)
@@ -350,10 +342,14 @@ app.post<{ Params: { id: string; key: string } }>(
 app.post<{ Params: { id: string; key: string } }>(
   '/api/questlog/pages/:id/quests/:key/complete',
   async (request) => {
-    questlogPage(request.params.id)
-    guard(isIssueKey(request.params.key), 'Kein gültiger Jira-Schlüssel')
-    await rewards?.assertHandable(request.params.key)
-    const handed = await completeQuest(config.questlog.jira, jiraCredentials, deps, request.params.key)
+    const page = questlogPage(request.params.id)
+    const key = request.params.key
+    guard(isIssueKey(key), 'Kein gültiger Jira-Schlüssel')
+    const quest = rewards ? questOn((await pagePayload(page)).data, key) : null
+    guard(rewards == null || quest != null, `${key} steht nicht auf dieser Seite`)
+    await rewards?.assertHandable(key)
+    const handed = await completeQuest(config.questlog.jira, jiraCredentials, deps, key)
+    if (quest) await rewards?.handIn(quest)
     afterQuestWrite()
     return handed
   },
@@ -366,7 +362,6 @@ app.post<{ Params: { id: string; key: string } }>(
     guard(isIssueKey(request.params.key), 'Kein gültiger Jira-Schlüssel')
     await rewards?.assertAbandonable(request.params.key)
     const dropped = await abandonQuest(config.questlog.jira, jiraCredentials, deps, request.params.key)
-    forgetQuestlogPages()
     await rewards?.withdraw(request.params.key)
     afterQuestWrite()
     return dropped

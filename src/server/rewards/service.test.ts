@@ -4,17 +4,16 @@ import type { Db } from '../db.js'
 import type { JiraConfig } from '../questlog/config.js'
 import { memoryDb } from './memoryDb.js'
 import {
-  completedQuests,
   createRewards,
   dueDate,
   FALLBACK_DUE_DAYS,
   parseIds,
   parseEquip,
   parseShares,
+  questOn,
   type SprintWindow,
   SYNC_SECONDS,
 } from './service.js'
-import { setting } from './store.js'
 
 const jira: JiraConfig = {
   baseUrl: 'https://jira.test',
@@ -80,10 +79,10 @@ beforeEach(async () => {
   await db.query('truncate inventory, message, share, quest, player, setting restart identity cascade')
 })
 
-function setup(over: { me?: object; quests?: Quest[]; resolved?: string; sprint?: SprintWindow | null } = {}) {
+function setup(over: { me?: object; resolved?: string; sprint?: SprintWindow | null } = {}) {
   const clock = { now: new Date('2026-11-12T09:00:00.000Z') }
   const calls: URL[] = []
-  const state = { me: over.me ?? giver, quests: over.quests ?? [quest('PRO-1'), quest('PRO-2', 'active')] }
+  const state = { me: over.me ?? giver }
   const fetch = (async (input: string | URL | Request) => {
     const url = new URL(String(input))
     calls.push(url)
@@ -101,29 +100,25 @@ function setup(over: { me?: object; quests?: Quest[]; resolved?: string; sprint?
       })
     }
     if (url.pathname.endsWith('/user/search')) return json([anna])
-    if (url.pathname.endsWith('/search')) return json({ issues: [], total: 0 })
     return new Response('nope', { status: 404 })
   }) as typeof globalThis.fetch
   const rewards = createRewards({
     db,
     jira,
-    boardId: 7,
     credentials: { token: 't', email: null },
     deps: { fetch, now: () => clock.now },
-    pages: async () => [page(state.quests)],
     sprint: async () => (over.sprint === undefined ? sprint : over.sprint),
   })
   const issueCalls = () => calls.filter((url) => url.pathname.startsWith('/rest/api/2/issue/'))
   return { rewards, calls, issueCalls, clock, state }
 }
 
-describe('completedQuests', () => {
-  it('takes every finished quest once, from all pages', () => {
-    expect(
-      completedQuests([page([quest('PRO-1'), quest('PRO-2', 'active')]), page([quest('PRO-1'), quest('PRO-3')])]).map(
-        (entry) => entry.key,
-      ),
-    ).toEqual(['PRO-1', 'PRO-3'])
+describe('questOn', () => {
+  it('finds a quest in any series of the page', () => {
+    const shown = { ...page([]), series: [page([quest('PRO-1')]).series[0]!, page([quest('PRO-7')]).series[0]!] }
+
+    expect(questOn(shown, 'PRO-7')?.key).toBe('PRO-7')
+    expect(questOn(shown, 'PRO-9')).toBeNull()
   })
 })
 
@@ -168,7 +163,7 @@ describe('parseIds', () => {
 describe('reward guards', () => {
   it('stamps each quest of a page with the state of its reward', async () => {
     const { rewards } = setup()
-    await rewards.sync(true)
+    await rewards.handIn(quest('PRO-1'))
 
     const stamped = await rewards.stamp(page([quest('PRO-1'), quest('PRO-2', 'active')]))
 
@@ -183,14 +178,14 @@ describe('reward guards', () => {
 
   it('refuses a second hand-in while the giver has not distributed yet', async () => {
     const { rewards } = setup()
-    await rewards.sync(true)
+    await rewards.handIn(quest('PRO-1'))
 
     await expect(rewards.assertHandable('PRO-1')).rejects.toThrow('PRO-1 ist schon abgegeben, die Belohnung')
   })
 
   it('refuses a second hand-in once the reward is paid', async () => {
     const { rewards } = setup()
-    await rewards.sync(true)
+    await rewards.handIn(quest('PRO-1'))
     await rewards.distribute('PRO-1', [{ id: 'JIRAUSER1', name: 'Anna Berg', share: 1 }])
 
     await expect(rewards.assertHandable('PRO-1')).rejects.toThrow('PRO-1 ist schon abgegeben und belohnt')
@@ -199,101 +194,87 @@ describe('reward guards', () => {
 
   it('lets a quest go whose reward still waits', async () => {
     const { rewards } = setup()
-    await rewards.sync(true)
+    await rewards.handIn(quest('PRO-1'))
 
     await expect(rewards.assertAbandonable('PRO-1')).resolves.toBeUndefined()
   })
 
   it('forgets the reward of an abandoned quest and files it again on the next hand-in', async () => {
     const { rewards } = setup()
-    await rewards.sync(true)
+    await rewards.handIn(quest('PRO-1'))
 
     await rewards.withdraw('PRO-1')
     expect((await rewards.stamp(page([quest('PRO-1')]))).rewards).toEqual({})
 
-    await rewards.sync(true)
+    await rewards.handIn(quest('PRO-1'))
     expect((await rewards.stamp(page([quest('PRO-1')]))).rewards).toEqual({ 'PRO-1': 'pending' })
   })
 
-  it('waits for a running sync, so it cannot file the quest again behind its back', async () => {
-    const { rewards } = setup()
-
-    void rewards.sync(true)
-    await rewards.withdraw('PRO-1')
-
-    expect((await rewards.stamp(page([quest('PRO-1')]))).rewards).toEqual({})
-  })
 })
 
-describe('sync', () => {
-  it('files every finished quest of the sprint with its contributors and a task for the giver', async () => {
+describe('handIn', () => {
+  it('files the handed in quest for everybody who worked on it and asks the giver to distribute', async () => {
     const { rewards, issueCalls } = setup()
 
-    await rewards.sync(true)
+    await rewards.handIn(quest('PRO-1'))
 
     expect(issueCalls().map((url) => url.pathname)).toEqual(['/rest/api/2/issue/PRO-1'])
-    expect(await setting(db, 'cutoff')).toBe(sprint.start)
     const draft = await rewards.draft('PRO-1')
     expect(draft).toMatchObject({ dueAt: sprint.end, mayDistribute: true, giver: { id: 'JIRAUSER9' } })
     expect(draft.shares.map(({ id, share }) => ({ id, share }))).toEqual([{ id: 'JIRAUSER1', share: 1 }])
     expect((await rewards.inbox()).messages.map((message) => message.kind)).toEqual(['distribute'])
   })
 
-  it('asks Jira about a quest only once', async () => {
+  it('gives two weeks without a running sprint', async () => {
+    const { rewards, clock } = setup({ sprint: null })
+
+    await rewards.handIn(quest('PRO-1'))
+
+    expect((await rewards.draft('PRO-1')).dueAt).toBe(dueDate(null, clock.now).toISOString())
+  })
+})
+
+describe('sync', () => {
+  it('files nothing on its own, so a quest done directly in Jira earns nothing', async () => {
     const { rewards, issueCalls } = setup()
 
     await rewards.sync(true)
-    await rewards.sync(true)
 
-    expect(issueCalls()).toHaveLength(1)
-  })
-
-  it('leaves quests finished before the cutoff to the old rule and does not ask again', async () => {
-    const { rewards, issueCalls } = setup({ resolved: '2026-11-01T09:00:00.000Z' })
-
-    await rewards.sync(true)
-    await rewards.sync(true)
-
-    expect(issueCalls()).toHaveLength(1)
-    await expect(rewards.draft('PRO-1')).rejects.toThrow('Keine Belohnung zu PRO-1')
-  })
-
-  it('takes today as the cutoff without a sprint', async () => {
-    const { rewards, clock } = setup({ sprint: null })
-
-    await rewards.sync(true)
-
-    expect(await setting(db, 'cutoff')).toBe(clock.now.toISOString())
-  })
-
-  it('syncs at most once a minute unless forced', async () => {
-    const { rewards, issueCalls, clock, state } = setup()
-    await rewards.sync()
-    state.quests = [quest('PRO-1'), quest('PRO-3')]
-
-    await rewards.sync()
-    expect(issueCalls()).toHaveLength(1)
-
-    clock.now = new Date(clock.now.getTime() + SYNC_SECONDS * 1000 + 1)
-    await rewards.sync()
-    expect(issueCalls()).toHaveLength(2)
+    expect(issueCalls()).toEqual([])
+    expect((await rewards.stamp(page([quest('PRO-1')]))).rewards).toEqual({})
   })
 
   it('distributes overdue quests by the proposal', async () => {
     const { rewards, clock } = setup()
-    await rewards.sync(true)
+    await rewards.handIn(quest('PRO-1'))
 
     clock.now = new Date('2026-11-21T00:00:00.000Z')
     await rewards.sync(true)
 
     expect((await rewards.draft('PRO-1')).distributedBy).toBe('auto')
   })
+
+  it('syncs at most once a minute unless forced', async () => {
+    const { rewards, clock } = setup()
+    await rewards.handIn(quest('PRO-1'))
+    const due = new Date(sprint.end!).getTime()
+
+    clock.now = new Date(due - 10_000)
+    await rewards.sync()
+    clock.now = new Date(due + 10_000)
+    await rewards.sync()
+    expect((await rewards.draft('PRO-1')).distributedAt).toBeNull()
+
+    clock.now = new Date(due + SYNC_SECONDS * 1000)
+    await rewards.sync()
+    expect((await rewards.draft('PRO-1')).distributedAt).not.toBeNull()
+  })
 })
 
 describe('distribute', () => {
   it('lets the giver split the reward', async () => {
     const { rewards } = setup()
-    await rewards.sync(true)
+    await rewards.handIn(quest('PRO-1'))
 
     const result = await rewards.distribute('PRO-1', [
       { id: 'JIRAUSER1', name: 'Anna Berg', share: 1 },
@@ -309,7 +290,7 @@ describe('distribute', () => {
 
   it('refuses anybody but the giver', async () => {
     const { rewards } = setup({ me: anna })
-    await rewards.sync(true)
+    await rewards.handIn(quest('PRO-1'))
 
     await expect(rewards.distribute('PRO-1', [{ id: 'JIRAUSER1', name: 'Anna', share: 1 }])).rejects.toThrow(
       'Nur Gerd Geber verteilt PRO-1',
@@ -318,7 +299,7 @@ describe('distribute', () => {
 
   it('refuses a second distribution and an empty one', async () => {
     const { rewards } = setup()
-    await rewards.sync(true)
+    await rewards.handIn(quest('PRO-1'))
 
     await expect(rewards.distribute('PRO-1', [])).rejects.toThrow('Niemand zum Verteilen')
     await rewards.distribute('PRO-1', [{ id: 'JIRAUSER1', name: 'Anna', share: 1 }])
@@ -337,19 +318,18 @@ describe('distribute', () => {
 })
 
 describe('profile', () => {
-  it('books the old quests once when the player first opens the profile', async () => {
+  it('opens without searching Jira for old quests', async () => {
     const { rewards, calls } = setup({ me: anna })
 
-    await rewards.profile()
-    await rewards.profile()
+    const result = await rewards.profile()
 
-    const searches = calls.filter((url) => url.pathname.endsWith('/search'))
-    expect(searches).toHaveLength(1)
-    expect(searches[0]!.searchParams.get('jql')).toContain('resolutiondate <')
+    expect(calls.filter((url) => url.pathname.endsWith('/search'))).toEqual([])
+    expect(result).toMatchObject({ experience: 0, completed: 0, pending: { quests: 0 } })
   })
 
   it('shows what is waiting for the giver as pending', async () => {
     const { rewards } = setup({ me: anna })
+    await rewards.handIn(quest('PRO-1'))
 
     const result = await rewards.profile()
 
@@ -360,7 +340,7 @@ describe('profile', () => {
 describe('inbox', () => {
   it('names the reader and marks messages read', async () => {
     const { rewards } = setup()
-    await rewards.sync(true)
+    await rewards.handIn(quest('PRO-1'))
     const before = await rewards.inbox()
 
     await rewards.markRead(before.messages.map((message) => message.id))

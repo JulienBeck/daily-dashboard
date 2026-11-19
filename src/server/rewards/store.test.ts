@@ -6,16 +6,11 @@ import {
   distributeDue,
   draft,
   inbox,
-  isOpened,
-  knownKeys,
   markRead,
-  openPlayer,
   profile,
   type QuestRecord,
   recordQuest,
   rewardStates,
-  setting,
-  settleSetting,
   withdraw,
 } from './store.js'
 
@@ -64,14 +59,6 @@ const wallet = async (id: string) => {
   return { experience: Number(rows[0]?.experience), copper: Number(rows[0]?.copper) }
 }
 
-describe('settings', () => {
-  it('keeps the first value, so the cutoff never moves once it is set', async () => {
-    expect(await setting(db, 'cutoff')).toBeNull()
-    expect(await settleSetting(db, 'cutoff', 'a')).toBe('a')
-    expect(await settleSetting(db, 'cutoff', 'b')).toBe('a')
-  })
-})
-
 describe('recordQuest', () => {
   it('files the quest with its proposal and asks the giver to distribute', async () => {
     expect(await recordQuest(db, record())).toBe(true)
@@ -102,7 +89,7 @@ describe('recordQuest', () => {
     expect(await recordQuest(db, record({ title: 'anders' }))).toBe(false)
     expect(await inbox(db, giver)).toHaveLength(1)
     expect((await draft(db, 'PRO-1', giver))!.title).toBe('Index nachts neu bauen')
-    expect(await knownKeys(db, ['PRO-1', 'PRO-2'])).toEqual(new Set(['PRO-1']))
+    expect(await rewardStates(db, ['PRO-1', 'PRO-2'])).toEqual({ 'PRO-1': 'pending' })
   })
 
   it('sends nobody a message for a quest without giver', async () => {
@@ -119,10 +106,6 @@ describe('recordQuest', () => {
       { id: anna.id, share: 0.5 },
       { id: ben.id, share: 0.5 },
     ])
-  })
-
-  it('knows no keys when asked for none', async () => {
-    expect(await knownKeys(db, [])).toEqual(new Set())
   })
 })
 
@@ -268,41 +251,6 @@ describe('inbox', () => {
 
   it('accepts an empty list of read messages', async () => {
     await expect(markRead(db, giver, [], now)).resolves.toBeUndefined()
-  })
-})
-
-describe('openPlayer', () => {
-  const legacy = [
-    {
-      key: 'PRO-0',
-      title: 'Alt',
-      webUrl: 'https://jira.test/browse/PRO-0',
-      difficulty: 'trivial' as const,
-      experience: 150,
-      copper: 2500,
-      completedAt: new Date('2026-10-01T10:00:00Z'),
-    },
-  ]
-
-  it('books the quests from before the cutoff once, at the old rule', async () => {
-    expect(await isOpened(db, anna.id)).toBe(false)
-
-    await openPlayer(db, anna, legacy, now)
-    await openPlayer(db, anna, [...legacy, { ...legacy[0]!, key: 'PRO-00' }], now)
-
-    expect(await isOpened(db, anna.id)).toBe(true)
-    expect(await wallet(anna.id)).toEqual({ experience: 150, copper: 2500 })
-    expect((await draft(db, 'PRO-0', anna))!.distributedBy).toBe('legacy')
-    expect(await draft(db, 'PRO-00', anna)).toBeNull()
-  })
-
-  it('keeps what the player already earned before opening the profile', async () => {
-    await recordQuest(db, record())
-    await distribute(db, 'PRO-1', [{ ...anna, share: 1 }], giver.id, now)
-
-    await openPlayer(db, anna, [...legacy, { ...legacy[0]!, key: 'PRO-1' }], now)
-
-    expect(await wallet(anna.id)).toEqual({ experience: 600, copper: 11900 })
   })
 })
 

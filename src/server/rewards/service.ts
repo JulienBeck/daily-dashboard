@@ -5,21 +5,16 @@ import type { Db } from '../db.js'
 import type { JiraConfig } from '../questlog/config.js'
 import type { JiraCredentials, JiraDeps } from '../questlog/jira.js'
 import { inventory, outfit, setEquipped } from './equipment.js'
-import { fetchLegacy, fetchMe, fetchQuestRecord, type Me, searchUsers } from './jira.js'
+import { fetchMe, fetchQuestRecord, type Me, searchUsers } from './jira.js'
 import {
   distribute,
   distributeDue,
   draft,
   inbox,
-  isOpened,
-  knownKeys,
   markRead,
-  openPlayer,
   profile,
   recordQuest,
   rewardStates,
-  setting,
-  settleSetting,
   withdraw,
 } from './store.js'
 
@@ -36,23 +31,21 @@ export interface SprintWindow {
 export interface RewardsSetup {
   db: Db
   jira: JiraConfig
-  boardId: number | null
   credentials: JiraCredentials
   deps: JiraDeps & { now: () => Date }
-  pages: () => Promise<PagePayload[]>
   sprint: () => Promise<SprintWindow | null>
-}
-
-export function completedQuests(pages: readonly PagePayload[]): Quest[] {
-  const byKey = new Map<string, Quest>()
-  for (const page of pages)
-    for (const series of page.series)
-      for (const quest of series.quests) if (quest.state === 'complete') byKey.set(quest.key, quest)
-  return [...byKey.values()]
 }
 
 export function questKeys(page: PagePayload): string[] {
   return page.series.flatMap((series) => series.quests.map((quest) => quest.key))
+}
+
+export function questOn(page: PagePayload, key: string): Quest | null {
+  for (const series of page.series) {
+    const found = series.quests.find((quest) => quest.key === key)
+    if (found) return found
+  }
+  return null
 }
 
 export function dueDate(sprint: SprintWindow | null, now: Date): Date {
@@ -65,7 +58,6 @@ export function createRewards(setup: RewardsSetup) {
   let me: { value: Me; at: number } | null = null
   let lastSync = 0
   let running: Promise<void> | null = null
-  const before = new Set<string>()
 
   async function currentUser(): Promise<Me> {
     const now = deps.now().getTime()
@@ -75,32 +67,8 @@ export function createRewards(setup: RewardsSetup) {
     return me.value
   }
 
-  async function cutoff(sprint: SprintWindow | null): Promise<Date> {
-    const stored = await setting(db, 'cutoff')
-    if (stored) return new Date(stored)
-    const start = sprint?.start ?? deps.now().toISOString()
-    return new Date(await settleSetting(db, 'cutoff', new Date(start).toISOString()))
-  }
-
   async function sync(): Promise<void> {
-    const now = deps.now()
-    const sprint = await setup.sprint().catch(() => null)
-    const since = await cutoff(sprint)
-    const quests = completedQuests(await setup.pages()).filter((quest) => !before.has(quest.key))
-    const known = await knownKeys(
-      db,
-      quests.map((quest) => quest.key),
-    )
-    for (const quest of quests) {
-      if (known.has(quest.key)) continue
-      const record = await fetchQuestRecord(jira, credentials, deps, quest, dueDate(sprint, now), now)
-      if (record.completedAt.getTime() < since.getTime()) {
-        before.add(quest.key)
-        continue
-      }
-      await recordQuest(db, record)
-    }
-    await distributeDue(db, now)
+    await distributeDue(db, deps.now())
   }
 
   function syncSoon(force = false): Promise<void> {
@@ -137,19 +105,19 @@ export function createRewards(setup: RewardsSetup) {
       if ((await stateOf(key)) === 'paid') throw new Error(`${key} ist schon belohnt und lässt sich nicht mehr abbrechen`)
     },
 
-    async withdraw(key: string): Promise<boolean> {
-      await running?.catch(() => undefined)
+    async handIn(quest: Quest): Promise<void> {
+      const now = deps.now()
+      const sprint = await setup.sprint().catch(() => null)
+      await recordQuest(db, await fetchQuestRecord(jira, credentials, deps, quest, dueDate(sprint, now), now))
+    },
+
+    withdraw(key: string): Promise<boolean> {
       return withdraw(db, key)
     },
 
     async profile(): Promise<ProfilePayload> {
       const user = await currentUser()
       await syncSoon()
-      if (!(await isOpened(db, user.id))) {
-        const sprint = await setup.sprint().catch(() => null)
-        const legacy = await fetchLegacy(jira, setup.boardId, credentials, deps, await cutoff(sprint))
-        await openPlayer(db, user, legacy, deps.now())
-      }
       return profile(db, user, user.avatar)
     },
 
