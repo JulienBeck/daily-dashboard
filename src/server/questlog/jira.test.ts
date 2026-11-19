@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { JiraConfig, PageConfig } from './config.js'
 import {
+  abandonQuest,
   acceptQuest,
   apiPath,
   authHeader,
@@ -31,6 +32,7 @@ const jira: JiraConfig = {
   epicNameField: null,
   doneStatusCategories: ['done'],
   doingStatusCategories: ['indeterminate'],
+  openStatusCategories: ['new'],
   maxQuests: 100,
 }
 
@@ -360,7 +362,7 @@ describe('toQuest and the epic', () => {
       'https://jira.test',
     )
     expect(quest.seriesKey).toBe('PRO-100')
-    // The link carries no title; that is looked up afterwards.
+    // The link carries no title; that is looked up later.
     expect(quest.seriesName).toBeNull()
   })
 
@@ -787,7 +789,7 @@ describe('acceptQuest', () => {
     expect(taken).toEqual({ key: 'PRO-42', status: 'In Progress', assignee: 'Julien Beck' })
     const calls = fetchMock.mock.calls.map(([url]) => url)
     expect(calls).toContain('https://jira.test/rest/api/2/issue/PRO-42/assignee')
-    // Data Center wants the user name; accountId is Cloud only.
+    // Data Center wants the username; accountId is Cloud only.
     const assign = fetchMock.mock.calls.find(([url]) => url.endsWith('/assignee'))!
     expect(JSON.parse((assign[1] as any).body)).toEqual({ name: 'jbeck' })
     expect((assign[1] as any).method).toBe('PUT')
@@ -852,6 +854,82 @@ describe('completeQuest', () => {
   it('refuses something that is not an issue key', async () => {
     await expect(
       completeQuest(jira, { token: 't', email: null }, { fetch: vi.fn() as any }, '../secrets'),
+    ).rejects.toThrow(/Not a Jira issue key/)
+  })
+})
+
+describe('abandonQuest', () => {
+  const back = [
+    { id: '3', name: 'Start', to: { statusCategory: { key: 'indeterminate' } } },
+    { id: '11', name: 'Reopen', to: { name: 'Open', statusCategory: { key: 'new' } } },
+  ]
+
+  const dropping = (transitions: unknown[], assignee: unknown = { name: 'jbeck', accountId: 'acc-1' }) =>
+    vi.fn(async (url: string, init?: any) => {
+      if (url.endsWith('/myself')) return ok({ name: 'jbeck', accountId: 'acc-1', displayName: 'Julien Beck' })
+      if (url.endsWith('?fields=assignee')) return ok({ fields: { assignee } })
+      if (url.endsWith('/transitions') && init?.method !== 'POST') return ok({ transitions })
+      return { ok: true, status: 204, json: async () => ({}), text: async () => '' }
+    })
+
+  const writes = (fetchMock: ReturnType<typeof dropping>) =>
+    fetchMock.mock.calls
+      .filter(([, init]) => (init as any)?.method === 'POST' || (init as any)?.method === 'PUT')
+      .map(([url, init]) => ({ url, method: (init as any).method, body: JSON.parse((init as any).body) }))
+
+  it('moves the quest back into an open status and then lets go of it', async () => {
+    const fetchMock = dropping(back)
+
+    const dropped = await abandonQuest(jira, { token: 't', email: null }, { fetch: fetchMock as any }, 'PRO-42')
+
+    expect(dropped).toEqual({ key: 'PRO-42', status: 'Open' })
+    expect(writes(fetchMock)).toEqual([
+      { url: 'https://jira.test/rest/api/2/issue/PRO-42/transitions', method: 'POST', body: { transition: { id: '11' } } },
+      { url: 'https://jira.test/rest/api/2/issue/PRO-42/assignee', method: 'PUT', body: { name: null } },
+    ])
+  })
+
+  it('clears the account id on Cloud', async () => {
+    const fetchMock = dropping(back, { accountId: 'acc-1' })
+
+    await abandonQuest({ ...jira, flavor: 'cloud' }, { token: 't', email: 'j@test' }, { fetch: fetchMock as any }, 'PRO-42')
+
+    expect(writes(fetchMock).at(-1)).toEqual({
+      url: 'https://jira.test/rest/api/3/issue/PRO-42/assignee',
+      method: 'PUT',
+      body: { accountId: null },
+    })
+  })
+
+  it('leaves somebody else’s quest alone', async () => {
+    const fetchMock = dropping(back, { name: 'anna', displayName: 'Anna Berg' })
+
+    await expect(
+      abandonQuest(jira, { token: 't', email: null }, { fetch: fetchMock as any }, 'PRO-42'),
+    ).rejects.toThrow('PRO-42 belongs to Anna Berg, not to you')
+    expect(writes(fetchMock)).toEqual([])
+  })
+
+  it('reopens a quest nobody holds', async () => {
+    const fetchMock = dropping(back, null)
+
+    await abandonQuest(jira, { token: 't', email: null }, { fetch: fetchMock as any }, 'PRO-42')
+
+    expect(writes(fetchMock).map((write) => write.method)).toEqual(['POST', 'PUT'])
+  })
+
+  it('changes nothing when the workflow offers no way back', async () => {
+    const fetchMock = dropping([back[0]])
+
+    await expect(
+      abandonQuest(jira, { token: 't', email: null }, { fetch: fetchMock as any }, 'PRO-42'),
+    ).rejects.toThrow(/no transition into an open status — offered: Start/)
+    expect(writes(fetchMock)).toEqual([])
+  })
+
+  it('refuses something that is not an issue key', async () => {
+    await expect(
+      abandonQuest(jira, { token: 't', email: null }, { fetch: vi.fn() as any }, '../secrets'),
     ).rejects.toThrow(/Not a Jira issue key/)
   })
 })

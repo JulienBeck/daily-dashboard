@@ -1,5 +1,5 @@
 import { type EquipmentPayload, itemById, sameSlot, STARTER } from '../../shared/avatar.js'
-import type { PagePayload, ProfilePayload, Quest } from '../../shared/questlog/types.js'
+import type { PagePayload, ProfilePayload, Quest, RewardState } from '../../shared/questlog/types.js'
 import type { InboxPayload, Person, RewardDraft, Weighted } from '../../shared/rewards.js'
 import type { Db } from '../db.js'
 import type { JiraConfig } from '../questlog/config.js'
@@ -17,8 +17,10 @@ import {
   openPlayer,
   profile,
   recordQuest,
+  rewardStates,
   setting,
   settleSetting,
+  withdraw,
 } from './store.js'
 
 export const ME_SECONDS = 600
@@ -47,6 +49,10 @@ export function completedQuests(pages: readonly PagePayload[]): Quest[] {
     for (const series of page.series)
       for (const quest of series.quests) if (quest.state === 'complete') byKey.set(quest.key, quest)
   return [...byKey.values()]
+}
+
+export function questKeys(page: PagePayload): string[] {
+  return page.series.flatMap((series) => series.quests.map((quest) => quest.key))
 }
 
 export function dueDate(sprint: SprintWindow | null, now: Date): Date {
@@ -110,8 +116,31 @@ export function createRewards(setup: RewardsSetup) {
     return running
   }
 
+  async function stateOf(key: string): Promise<RewardState | undefined> {
+    return (await rewardStates(db, [key]))[key]
+  }
+
   return {
     sync: syncSoon,
+
+    async stamp(page: PagePayload): Promise<PagePayload> {
+      return { ...page, rewards: await rewardStates(db, questKeys(page)) }
+    },
+
+    async assertHandable(key: string): Promise<void> {
+      const state = await stateOf(key)
+      if (state === 'paid') throw new Error(`${key} ist schon abgegeben und belohnt`)
+      if (state === 'pending') throw new Error(`${key} ist schon abgegeben, die Belohnung verteilt der Questgeber`)
+    },
+
+    async assertAbandonable(key: string): Promise<void> {
+      if ((await stateOf(key)) === 'paid') throw new Error(`${key} ist schon belohnt und lässt sich nicht mehr abbrechen`)
+    },
+
+    async withdraw(key: string): Promise<boolean> {
+      await running?.catch(() => undefined)
+      return withdraw(db, key)
+    },
 
     async profile(): Promise<ProfilePayload> {
       const user = await currentUser()

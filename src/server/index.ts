@@ -19,6 +19,7 @@ import {
 } from './jira.js'
 import { pageById } from './questlog/config.js'
 import {
+  abandonQuest,
   acceptQuest,
   completeQuest,
   createQuest,
@@ -307,9 +308,15 @@ app.get<{ Querystring: { q?: string } }>('/api/users', async (request) =>
 
 app.get<{ Params: { id: string } }>('/api/questlog/pages/:id', async (request) => {
   const page = questlogPage(request.params.id)
-  return cache.get(`questlog:${page.id}`, config.questlog.cacheSeconds.jira, () =>
+  const payload = await cache.get(`questlog:${page.id}`, config.questlog.cacheSeconds.jira, () =>
     fetchPage(config.questlog.jira, page, jiraCredentials, deps),
   )
+  if (!rewards) return payload
+  const stamped = await rewards.stamp(payload.data).catch((error: unknown) => {
+    app.log.warn(error)
+    return payload.data
+  })
+  return { ...payload, data: stamped }
 })
 
 app.post<{ Params: { id: string }; Body: Partial<NewQuest> }>(
@@ -345,9 +352,24 @@ app.post<{ Params: { id: string; key: string } }>(
   async (request) => {
     questlogPage(request.params.id)
     guard(isIssueKey(request.params.key), 'Kein gültiger Jira-Schlüssel')
+    await rewards?.assertHandable(request.params.key)
     const handed = await completeQuest(config.questlog.jira, jiraCredentials, deps, request.params.key)
     afterQuestWrite()
     return handed
+  },
+)
+
+app.post<{ Params: { id: string; key: string } }>(
+  '/api/questlog/pages/:id/quests/:key/abandon',
+  async (request) => {
+    questlogPage(request.params.id)
+    guard(isIssueKey(request.params.key), 'Kein gültiger Jira-Schlüssel')
+    await rewards?.assertAbandonable(request.params.key)
+    const dropped = await abandonQuest(config.questlog.jira, jiraCredentials, deps, request.params.key)
+    forgetQuestlogPages()
+    await rewards?.withdraw(request.params.key)
+    afterQuestWrite()
+    return dropped
   },
 )
 

@@ -1,5 +1,5 @@
 import { splitCoins } from '../../shared/questlog/quest.js'
-import type { Difficulty, ProfilePayload } from '../../shared/questlog/types.js'
+import type { Difficulty, ProfilePayload, RewardState } from '../../shared/questlog/types.js'
 import {
   type InboxMessage,
   normalise,
@@ -45,6 +45,20 @@ export async function knownKeys(db: Sql, keys: readonly string[]): Promise<Set<s
   if (keys.length === 0) return new Set()
   const { rows } = await db.query<{ key: string }>('select key from quest where key = any($1)', [keys])
   return new Set(rows.map((row) => row.key))
+}
+
+export async function rewardStates(db: Sql, keys: readonly string[]): Promise<Record<string, RewardState>> {
+  if (keys.length === 0) return {}
+  const { rows } = await db.query<{ key: string; distributed_at: unknown }>(
+    'select key, distributed_at from quest where key = any($1)',
+    [keys],
+  )
+  return Object.fromEntries(rows.map((row) => [row.key, row.distributed_at == null ? 'pending' : 'paid']))
+}
+
+export async function withdraw(db: Sql, key: string): Promise<boolean> {
+  const { rows } = await db.query('delete from quest where key = $1 and distributed_at is null returning key', [key])
+  return rows.length > 0
 }
 
 async function ensurePlayer(tx: Sql, person: Person): Promise<void> {

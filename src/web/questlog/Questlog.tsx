@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { applyFilter, type Filter } from '../../shared/questlog/quest'
 import type { Quest } from '../../shared/questlog/types'
 import {
+  abandonQuest,
   acceptQuest,
   completeQuest,
   createQuest,
@@ -9,6 +10,7 @@ import {
   getQuestlog,
   type NewQuestInput,
 } from './api'
+import { AbandonDialog } from './components/AbandonDialog'
 import { NewQuestForm } from './components/NewQuestForm'
 import { QuestActions, type QuestAction } from './components/QuestActions'
 import { QuestDetail } from './components/QuestDetail'
@@ -37,6 +39,7 @@ export function Questlog({ initialKey = null, onClose }: Props) {
   const [saving, setSaving] = useState(false)
   const [busy, setBusy] = useState<{ key: string; action: QuestAction } | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState<Quest | null>(null)
 
   const pages = useMemo(() => log.data?.pages ?? [], [log.data])
   const active = pageId ?? pages[0]?.id ?? null
@@ -129,6 +132,17 @@ export function Questlog({ initialKey = null, onClose }: Props) {
       const handed = await completeQuest(pageId, quest.key)
       return t.handedIn(handed.key, handed.status)
     })
+
+  const dropQuest = (quest: Quest) =>
+    writeQuest(quest, 'abandon', async (pageId) => {
+      const dropped = await abandonQuest(pageId, quest.key)
+      return t.abandoned(dropped.key, dropped.status)
+    })
+
+  const abandon = (quest: Quest) => {
+    if (quest.state === 'complete') setConfirming(quest)
+    else void dropQuest(quest)
+  }
 
   const submit = async (quest: NewQuestInput) => {
     if (!active) return
@@ -278,15 +292,24 @@ export function Questlog({ initialKey = null, onClose }: Props) {
             {t.create}
           </button>
         </div>
-        {/* An epic is read, not taken: with one on the sheet both buttons grey
-            out, because there is no story to move. */}
         <QuestActions
           quest={story}
+          reward={story ? (payload?.rewards[story.key] ?? null) : null}
           busy={story != null && busy?.key === story.key ? busy.action : null}
           onAccept={accept}
           onComplete={complete}
+          onAbandon={abandon}
         />
       </div>
+
+      <AbandonDialog
+        questKey={confirming?.key ?? null}
+        onConfirm={() => {
+          if (confirming) void dropQuest(confirming)
+          setConfirming(null)
+        }}
+        onClose={() => setConfirming(null)}
+      />
 
       <NewQuestForm
         open={formOpen}

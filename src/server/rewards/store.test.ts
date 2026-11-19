@@ -13,8 +13,10 @@ import {
   profile,
   type QuestRecord,
   recordQuest,
+  rewardStates,
   setting,
   settleSetting,
+  withdraw,
 } from './store.js'
 
 const anna = { id: 'JIRAUSER1', name: 'Anna Berg' }
@@ -176,6 +178,42 @@ describe('distribute', () => {
 
   it('refuses a quest it does not know', async () => {
     await expect(distribute(db, 'PRO-9', [{ ...anna, share: 1 }], giver.id, now)).rejects.toThrow('Unbekannte Quest')
+  })
+})
+
+describe('rewardStates', () => {
+  it('tells a waiting reward from a paid one and leaves unknown quests out', async () => {
+    await recordQuest(db, record())
+    await recordQuest(db, record({ key: 'PRO-2' }))
+    await distribute(db, 'PRO-2', [{ ...anna, share: 1 }], giver.id, now)
+
+    expect(await rewardStates(db, ['PRO-1', 'PRO-2', 'PRO-3'])).toEqual({ 'PRO-1': 'pending', 'PRO-2': 'paid' })
+  })
+
+  it('knows nothing when asked about nothing', async () => {
+    expect(await rewardStates(db, [])).toEqual({})
+  })
+})
+
+describe('withdraw', () => {
+  it('drops a waiting reward with its shares and the giver’s task', async () => {
+    await recordQuest(db, record())
+
+    expect(await withdraw(db, 'PRO-1')).toBe(true)
+
+    expect(await rewardStates(db, ['PRO-1'])).toEqual({})
+    expect((await db.query('select 1 from share')).rows).toHaveLength(0)
+    expect(await inbox(db, giver)).toEqual([])
+  })
+
+  it('keeps a reward that is already paid out', async () => {
+    await recordQuest(db, record())
+    await distribute(db, 'PRO-1', [{ ...anna, share: 1 }], giver.id, now)
+
+    expect(await withdraw(db, 'PRO-1')).toBe(false)
+
+    expect(await rewardStates(db, ['PRO-1'])).toEqual({ 'PRO-1': 'paid' })
+    expect(await wallet(anna.id)).toEqual({ experience: 450, copper: 9400 })
   })
 })
 

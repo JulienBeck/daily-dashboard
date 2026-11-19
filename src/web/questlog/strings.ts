@@ -52,12 +52,25 @@ export interface Strings {
   complete: string
   completing: string
   completeHint: string
+  handedInLabel: string
+  handedInHint: string
+  rewardedHint: string
+  abandon: string
+  abandoning: string
+  abandonHint: string
+  abandonUntaken: string
+  abandonRewarded: string
+  abandonWarnTitle: (key: string) => string
+  abandonWarnText: string
+  abandonConfirm: string
+  abandonKeep: string
   create: string
   createHint: string
   createForbidden: string
 
   taken: (key: string, who: string, status: string | null) => string
   handedIn: (key: string, status: string) => string
+  abandoned: (key: string, status: string) => string
   created: (key: string) => string
 
   formTitle: (page: string) => string
@@ -117,12 +130,26 @@ export const de: Strings = {
   complete: 'Quest abgeben',
   completing: 'Wird abgegeben …',
   completeHint: 'Die Quest abgeben und den Vorgang auf erledigt ziehen',
+  handedInLabel: 'Abgegeben',
+  handedInHint: 'Die Quest ist abgegeben — die Belohnung verteilt der Questgeber',
+  rewardedHint: 'Für diese Quest gab es schon eine Belohnung, sie lässt sich nicht noch einmal abgeben',
+  abandon: 'Quest abbrechen',
+  abandoning: 'Wird abgebrochen …',
+  abandonHint: 'Die Quest zurückgeben: Status wieder offen, niemand mehr zugewiesen',
+  abandonUntaken: 'Erst eine angenommene Quest lässt sich abbrechen',
+  abandonRewarded: 'Die Belohnung ist schon ausgeschüttet, die Quest bleibt abgeschlossen',
+  abandonWarnTitle: (key) => `${key} abbrechen?`,
+  abandonWarnText:
+    'Die Quest ist schon abgegeben. Brichst du sie jetzt ab, verfällt die Belohnung — der Questgeber kann sie nicht mehr verteilen.',
+  abandonConfirm: 'Trotzdem abbrechen',
+  abandonKeep: 'Behalten',
   create: 'Quest erstellen',
   createHint: 'Eine eigene Quest erstellen',
   createForbidden: 'Auf dieser Seite werden keine Quests erstellt',
 
   taken: (key, who, status) => `${key} übernimmt ${who}${status ? `, Status ${status}` : ''}`,
   handedIn: (key, status) => `${key} ist abgegeben, Status ${status}`,
+  abandoned: (key, status) => `${key} ist abgebrochen und wieder frei, Status ${status}`,
   created: (key) => `${key} ist vergeben — du bist der Questgeber`,
 
   formTitle: (page) => `Neue Quest auf der Seite „${page}“`,
@@ -182,12 +209,26 @@ export const en: Strings = {
   complete: 'Complete quest',
   completing: 'Handing in …',
   completeHint: 'Hand the quest in and move it to done',
+  handedInLabel: 'Handed in',
+  handedInHint: 'The quest is handed in — its giver hands out the reward',
+  rewardedHint: 'This quest has already been rewarded and cannot be handed in again',
+  abandon: 'Abandon quest',
+  abandoning: 'Abandoning …',
+  abandonHint: 'Give the quest back: status open again, nobody assigned',
+  abandonUntaken: 'Only an accepted quest can be abandoned',
+  abandonRewarded: 'The reward has been paid out, the quest stays closed',
+  abandonWarnTitle: (key) => `Abandon ${key}?`,
+  abandonWarnText:
+    'The quest is already handed in. Abandon it now and the reward is lost — its giver can no longer hand it out.',
+  abandonConfirm: 'Abandon anyway',
+  abandonKeep: 'Keep it',
   create: 'Create quest',
   createHint: 'Hand out a quest of your own',
   createForbidden: 'This page hands out no quests',
 
   taken: (key, who, status) => `${who} took ${key}${status ? `, status ${status}` : ''}`,
   handedIn: (key, status) => `${key} is handed in, status ${status}`,
+  abandoned: (key, status) => `${key} is abandoned and free again, status ${status}`,
   created: (key) => `${key} is handed out — you are its quest giver`,
 
   formTitle: (page) => `New quest on the “${page}” page`,

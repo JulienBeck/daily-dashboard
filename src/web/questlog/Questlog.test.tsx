@@ -50,6 +50,7 @@ const payload = (quests: Quest[], over: Partial<PagePayload> = {}): Payload<Page
     series: [{ key: 'PRO-100', name: 'Krieg der Dornen', webUrl: 'https://jira.test/browse/PRO-100', epic: null, quests }],
     total: quests.length,
     complete: quests.filter((entry) => entry.state === 'complete').length,
+    rewards: {},
     ...over,
   },
   fetchedAt: '2026-10-26T08:00:00.000Z',
@@ -58,6 +59,7 @@ const payload = (quests: Quest[], over: Partial<PagePayload> = {}): Payload<Page
 })
 
 const quests = [quest({}), quest({ key: 'PRO-2', title: 'Der Seelenjäger', state: 'complete' })]
+const taken = quest({ state: 'active', status: 'In Progress', assignee: 'Julien' })
 
 beforeEach(() => {
   // Without the reset the call counts add up across the whole file.
@@ -91,7 +93,7 @@ describe('Questlog in English', () => {
     expect(screen.getByRole('heading', { name: 'Rewards' })).toBeInTheDocument()
     expect(screen.getByText('Experience')).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: 'Accept quest' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Complete quest' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Abandon quest' })).toBeInTheDocument()
   })
 
   it('leaves the ticket text alone — only the frame is translated', async () => {
@@ -192,7 +194,7 @@ describe('Questlog', () => {
       }),
     )
     expect(await screen.findByText(/PRO-77 ist vergeben/)).toBeInTheDocument()
-    expect(screen.getByRole('dialog', { hidden: true })).not.toHaveAttribute('open')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     // Without the reload the new quest would not show up until the next poll.
     await waitFor(() => expect(api.getPage).toHaveBeenCalledTimes(2))
   })
@@ -260,6 +262,7 @@ describe('Questlog', () => {
   })
 
   it('hands a quest in and reloads the page', async () => {
+    vi.mocked(api.getPage).mockResolvedValue(payload([taken, quests[1]!]))
     vi.mocked(api.completeQuest).mockResolvedValue({ key: 'PRO-1', status: 'Done' })
     render(<Questlog />)
     await screen.findByText('Quests: 1/2')
@@ -273,6 +276,7 @@ describe('Questlog', () => {
   })
 
   it('says why handing a quest in failed', async () => {
+    vi.mocked(api.getPage).mockResolvedValue(payload([taken, quests[1]!]))
     vi.mocked(api.completeQuest).mockRejectedValue(
       new Error('PRO-1 has no transition into a done status'),
     )
@@ -286,6 +290,73 @@ describe('Questlog', () => {
     ).toBeInTheDocument()
     // A failed hand-in must not be mistaken for a done quest.
     expect(api.getPage).toHaveBeenCalledTimes(1)
+  })
+
+  it('cannot hand in a quest that was rewarded before', async () => {
+    vi.mocked(api.getPage).mockResolvedValue(payload([taken], { rewards: { 'PRO-1': 'paid' } }))
+    render(<Questlog />)
+
+    expect(await screen.findByRole('button', { name: 'Quest abgeben' })).toBeDisabled()
+  })
+
+  describe('abandoning', () => {
+    const handedIn = quest({ state: 'complete', status: 'Done', assignee: 'Julien' })
+    const warning = () => screen.queryByRole('dialog', { name: 'PRO-1 abbrechen?' })
+    const abandonButton = async () => {
+      const button = await screen.findByRole('button', { name: 'Quest abbrechen' })
+      await waitFor(() => expect(button).toBeEnabled())
+      return button
+    }
+
+    it('gives an accepted quest back without asking and reloads the page', async () => {
+      vi.mocked(api.getPage).mockResolvedValue(payload([taken]))
+      vi.mocked(api.abandonQuest).mockResolvedValue({ key: 'PRO-1', status: 'Open' })
+      render(<Questlog />)
+
+      await userEvent.click(await abandonButton())
+
+      await waitFor(() => expect(api.abandonQuest).toHaveBeenCalledWith('ki', 'PRO-1'))
+      expect(warning()).not.toBeInTheDocument()
+      expect(await screen.findByText('PRO-1 ist abgebrochen und wieder frei, Status Open')).toBeInTheDocument()
+      await waitFor(() => expect(api.getPage).toHaveBeenCalledTimes(2))
+    })
+
+    it('warns before a handed in quest loses its reward', async () => {
+      vi.mocked(api.getPage).mockResolvedValue(payload([handedIn], { rewards: { 'PRO-1': 'pending' } }))
+      vi.mocked(api.abandonQuest).mockResolvedValue({ key: 'PRO-1', status: 'Open' })
+      render(<Questlog />)
+
+      await userEvent.click(await abandonButton())
+
+      expect(warning()).toHaveTextContent('verfällt die Belohnung')
+      expect(api.abandonQuest).not.toHaveBeenCalled()
+
+      await userEvent.click(screen.getByRole('button', { name: 'Trotzdem abbrechen' }))
+
+      await waitFor(() => expect(api.abandonQuest).toHaveBeenCalledWith('ki', 'PRO-1'))
+      expect(warning()).not.toBeInTheDocument()
+    })
+
+    it('keeps the handed in quest when the warning is turned down', async () => {
+      vi.mocked(api.getPage).mockResolvedValue(payload([handedIn]))
+      render(<Questlog />)
+
+      await userEvent.click(await abandonButton())
+      await userEvent.click(screen.getByRole('button', { name: 'Behalten' }))
+
+      expect(warning()).not.toBeInTheDocument()
+      expect(api.abandonQuest).not.toHaveBeenCalled()
+    })
+
+    it('says why abandoning failed', async () => {
+      vi.mocked(api.getPage).mockResolvedValue(payload([taken]))
+      vi.mocked(api.abandonQuest).mockRejectedValue(new Error('PRO-1 belongs to Anna, not to you'))
+      render(<Questlog />)
+
+      await userEvent.click(await abandonButton())
+
+      expect(await screen.findByText('PRO-1 belongs to Anna, not to you')).toBeInTheDocument()
+    })
   })
 
   describe('an epic on the sheet', () => {
@@ -337,7 +408,7 @@ describe('Questlog', () => {
       await waitFor(() =>
         expect(screen.getByRole('button', { name: 'Quest annehmen' })).toBeDisabled(),
       )
-      expect(screen.getByRole('button', { name: 'Quest abgeben' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Quest abbrechen' })).toBeDisabled()
     })
 
     it('goes back to a story and hands the buttons back', async () => {
@@ -349,7 +420,7 @@ describe('Questlog', () => {
       await userEvent.click(screen.getByRole('button', { name: /Seelenjäger/ }))
 
       expect(await screen.findByRole('heading', { name: 'Der Seelenjäger' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Quest annehmen' })).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'Quest abbrechen' })).toBeEnabled()
     })
   })
 

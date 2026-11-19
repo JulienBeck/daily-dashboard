@@ -1278,6 +1278,7 @@
 /* The same stone window as the book, only smaller. */
 .ql dialog.quest-form {
   width: min(560px, 92vw);
+  margin: auto;
   padding: 0;
   color: #e8d9b8;
   border: 6px solid transparent;
@@ -1366,12 +1367,20 @@
 
 .ql .quest-form .actions .btn {
   flex-basis: 30%;
+  white-space: nowrap;
 }
 
 .ql .form-error {
   margin: 0;
   font-size: 12px;
   color: #ffb0a0;
+}
+
+.ql .form-warning {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--tan-text);
 }
 
 /* The red lacquer button of the footer, squared and hung on the window's

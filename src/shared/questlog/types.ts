@@ -66,6 +66,8 @@ export interface QuestlogInfo {
   jiraBaseUrl: string
 }
 
+export type RewardState = 'pending' | 'paid'
+
 export interface PagePayload {
   page: PageInfo
   /** The JQL actually sent to Jira — shown in the UI so it can be checked. */
@@ -75,6 +77,7 @@ export interface PagePayload {
   series: Series[]
   total: number
   complete: number
+  rewards: Record<string, RewardState>
 }
 
 export interface Payload<T> {

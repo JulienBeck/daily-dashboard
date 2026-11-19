@@ -1,39 +1,59 @@
-import type { Quest } from '../../../shared/questlog/types'
-import { useStrings } from '../strings'
+import type { Quest, RewardState } from '../../../shared/questlog/types'
+import { type Strings, useStrings } from '../strings'
 
-export type QuestAction = 'accept' | 'complete'
+export type QuestAction = 'accept' | 'complete' | 'abandon'
 
 interface Props {
   quest: Quest | null
-  /** The write running on this quest; its button says so, the other one waits. */
+  reward: RewardState | null
   busy: QuestAction | null
   onAccept: (quest: Quest) => void
   onComplete: (quest: Quest) => void
+  onAbandon: (quest: Quest) => void
 }
 
-/** Taking and handing in the quest on the sheet, in the bar right under it. */
-export function QuestActions({ quest, busy, onAccept, onComplete }: Props) {
+function abandonHint(t: Strings, quest: Quest | null, reward: RewardState | null): string {
+  if (reward === 'paid') return t.abandonRewarded
+  if (!quest || quest.state === 'available') return t.abandonUntaken
+  return t.abandonHint
+}
+
+export function QuestActions({ quest, reward, busy, onAccept, onComplete, onAbandon }: Props) {
   const t = useStrings()
+  const idle = quest != null && busy == null
+  const state = quest?.state ?? 'available'
+
+  const main =
+    state === 'available'
+      ? { label: busy === 'accept' ? t.accepting : t.accept, hint: t.acceptHint, run: onAccept, open: idle }
+      : state === 'active'
+        ? {
+            label: busy === 'complete' ? t.completing : t.complete,
+            hint: reward ? t.rewardedHint : t.completeHint,
+            run: onComplete,
+            open: idle && reward == null,
+          }
+        : { label: t.handedInLabel, hint: t.handedInHint, run: onComplete, open: false }
 
   return (
     <div className="quest-actions">
       <button
         type="button"
         className="btn"
-        disabled={!quest || busy != null}
-        onClick={() => quest && onAccept(quest)}
-        title={t.acceptHint}
+        disabled={!idle || state === 'available' || reward === 'paid'}
+        onClick={() => quest && onAbandon(quest)}
+        title={abandonHint(t, quest, reward)}
       >
-        {busy === 'accept' ? t.accepting : t.accept}
+        {busy === 'abandon' ? t.abandoning : t.abandon}
       </button>
       <button
         type="button"
         className="btn"
-        disabled={!quest || busy != null}
-        onClick={() => quest && onComplete(quest)}
-        title={t.completeHint}
+        disabled={!main.open}
+        onClick={() => quest && main.run(quest)}
+        title={main.hint}
       >
-        {busy === 'complete' ? t.completing : t.complete}
+        {main.label}
       </button>
     </div>
   )

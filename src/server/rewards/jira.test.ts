@@ -22,6 +22,7 @@ const jira: JiraConfig = {
   epicNameField: 'customfield_3',
   doneStatusCategories: ['done'],
   doingStatusCategories: ['indeterminate'],
+  openStatusCategories: ['new'],
   maxQuests: 100,
 }
 

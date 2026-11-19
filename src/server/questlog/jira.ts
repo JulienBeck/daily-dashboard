@@ -453,6 +453,7 @@ export async function fetchPage(
     series,
     total: counted.total,
     complete: counted.complete,
+    rewards: {},
   }
 }
 
@@ -498,6 +499,12 @@ async function transitionsOf(
   return available.transitions ?? []
 }
 
+interface JiraUser {
+  name?: string
+  accountId?: string
+  displayName?: string
+}
+
 /**
  * Accepting a quest means taking it: assign it to the caller and move it into
  * the running column. Jira has no single call for that, so it is two.
@@ -512,13 +519,7 @@ export async function acceptQuest(
   const flavor = await detectFlavor(config, deps)
   const version = apiPath(flavor)
 
-  const me = await call<{ name?: string; accountId?: string; displayName?: string }>(
-    config,
-    credentials,
-    flavor,
-    deps,
-    `/rest/api/${version}/myself`,
-  )
+  const me = await call<JiraUser>(config, credentials, flavor, deps, `/rest/api/${version}/myself`)
   // Data Center identifies a user by name, Cloud by accountId.
   const body = flavor === 'cloud' ? { accountId: me.accountId } : { name: me.name }
   await put(config, credentials, flavor, deps, `/rest/api/${version}/issue/${key}/assignee`, body)
@@ -558,16 +559,57 @@ export async function completeQuest(
 
   const available = await transitionsOf(config, credentials, flavor, deps, key)
   const picked = pickTransition(available, config.doneStatusCategories)
-  if (!picked) {
-    const offered = available.map((transition) => transition.name).join(', ')
-    throw new Error(
-      `${key} has no transition into a done status${offered ? ` — offered: ${offered}` : ''}`,
-    )
-  }
+  if (!picked) throw noTransition(key, 'a done', available)
 
   await post(config, credentials, flavor, deps, `/rest/api/${version}/issue/${key}/transitions`, {
     transition: { id: picked.id },
   })
+
+  return { key, status: picked.to?.name ?? picked.name }
+}
+
+function noTransition(key: string, target: string, available: readonly Transition[]): Error {
+  const offered = available.map((transition) => transition.name).join(', ')
+  return new Error(
+    `${key} has no transition into ${target} status${offered ? ` — offered: ${offered}` : ''}`,
+  )
+}
+
+export async function abandonQuest(
+  config: JiraConfig,
+  credentials: JiraCredentials,
+  deps: JiraDeps,
+  key: string,
+): Promise<{ key: string; status: string }> {
+  if (!isIssueKey(key)) throw new Error(`Not a Jira issue key: ${key}`)
+  const flavor = await detectFlavor(config, deps)
+  const version = apiPath(flavor)
+
+  const [me, issue] = await Promise.all([
+    call<JiraUser>(config, credentials, flavor, deps, `/rest/api/${version}/myself`),
+    call<{ fields?: { assignee?: JiraUser | null } }>(
+      config,
+      credentials,
+      flavor,
+      deps,
+      `/rest/api/${version}/issue/${key}?fields=assignee`,
+    ),
+  ])
+  const holder = issue.fields?.assignee
+  const mine = flavor === 'cloud' ? holder?.accountId === me.accountId : holder?.name === me.name
+  if (holder && !mine) {
+    throw new Error(`${key} belongs to ${holder.displayName ?? holder.name ?? 'someone else'}, not to you`)
+  }
+
+  const available = await transitionsOf(config, credentials, flavor, deps, key)
+  const picked = pickTransition(available, config.openStatusCategories)
+  if (!picked) throw noTransition(key, 'an open', available)
+
+  await post(config, credentials, flavor, deps, `/rest/api/${version}/issue/${key}/transitions`, {
+    transition: { id: picked.id },
+  })
+  const nobody = flavor === 'cloud' ? { accountId: null } : { name: null }
+  await put(config, credentials, flavor, deps, `/rest/api/${version}/issue/${key}/assignee`, nobody)
 
   return { key, status: picked.to?.name ?? picked.name }
 }

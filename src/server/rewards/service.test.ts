@@ -24,6 +24,7 @@ const jira: JiraConfig = {
   epicNameField: 'customfield_3',
   doneStatusCategories: ['done'],
   doingStatusCategories: ['indeterminate'],
+  openStatusCategories: ['new'],
   maxQuests: 100,
 }
 
@@ -58,6 +59,7 @@ const page = (quests: Quest[]): PagePayload => ({
   series: [{ key: '', name: null, webUrl: null, epic: null, quests }],
   total: quests.length,
   complete: quests.length,
+  rewards: {},
 })
 
 const anna = { key: 'JIRAUSER1', displayName: 'Anna Berg' }
@@ -160,6 +162,66 @@ describe('parseIds', () => {
   it('keeps whole numbers only', () => {
     expect(parseIds([1, '2', 3.5, 4])).toEqual([1, 4])
     expect(parseIds('1')).toEqual([])
+  })
+})
+
+describe('reward guards', () => {
+  it('stamps each quest of a page with the state of its reward', async () => {
+    const { rewards } = setup()
+    await rewards.sync(true)
+
+    const stamped = await rewards.stamp(page([quest('PRO-1'), quest('PRO-2', 'active')]))
+
+    expect(stamped.rewards).toEqual({ 'PRO-1': 'pending' })
+  })
+
+  it('lets a quest be handed in that has no reward yet', async () => {
+    const { rewards } = setup()
+
+    await expect(rewards.assertHandable('PRO-1')).resolves.toBeUndefined()
+  })
+
+  it('refuses a second hand-in while the giver has not distributed yet', async () => {
+    const { rewards } = setup()
+    await rewards.sync(true)
+
+    await expect(rewards.assertHandable('PRO-1')).rejects.toThrow('PRO-1 ist schon abgegeben, die Belohnung')
+  })
+
+  it('refuses a second hand-in once the reward is paid', async () => {
+    const { rewards } = setup()
+    await rewards.sync(true)
+    await rewards.distribute('PRO-1', [{ id: 'JIRAUSER1', name: 'Anna Berg', share: 1 }])
+
+    await expect(rewards.assertHandable('PRO-1')).rejects.toThrow('PRO-1 ist schon abgegeben und belohnt')
+    await expect(rewards.assertAbandonable('PRO-1')).rejects.toThrow('PRO-1 ist schon belohnt')
+  })
+
+  it('lets a quest go whose reward still waits', async () => {
+    const { rewards } = setup()
+    await rewards.sync(true)
+
+    await expect(rewards.assertAbandonable('PRO-1')).resolves.toBeUndefined()
+  })
+
+  it('forgets the reward of an abandoned quest and files it again on the next hand-in', async () => {
+    const { rewards } = setup()
+    await rewards.sync(true)
+
+    await rewards.withdraw('PRO-1')
+    expect((await rewards.stamp(page([quest('PRO-1')]))).rewards).toEqual({})
+
+    await rewards.sync(true)
+    expect((await rewards.stamp(page([quest('PRO-1')]))).rewards).toEqual({ 'PRO-1': 'pending' })
+  })
+
+  it('waits for a running sync, so it cannot file the quest again behind its back', async () => {
+    const { rewards } = setup()
+
+    void rewards.sync(true)
+    await rewards.withdraw('PRO-1')
+
+    expect((await rewards.stamp(page([quest('PRO-1')]))).rewards).toEqual({})
   })
 })
 

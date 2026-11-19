@@ -22,6 +22,7 @@ export interface JiraConfig {
   epicNameField: string | null
   doneStatusCategories: string[]
   doingStatusCategories: string[]
+  openStatusCategories: string[]
   maxQuests: number
 }
 
@@ -81,6 +82,9 @@ export function parseConfig(raw: unknown): QuestlogConfig {
       doingStatusCategories: Array.isArray(jira.doingStatusCategories)
         ? jira.doingStatusCategories.map(String)
         : ['indeterminate'],
+      openStatusCategories: Array.isArray(jira.openStatusCategories)
+        ? jira.openStatusCategories.map(String)
+        : ['new'],
       maxQuests: Number(jira.maxQuests ?? 100),
     },
     pages: (Array.isArray(source.pages) ? source.pages : []).map(parsePage),

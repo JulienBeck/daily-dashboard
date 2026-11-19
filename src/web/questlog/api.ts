@@ -45,3 +45,9 @@ export const completeQuest = (id: string, key: string) =>
     `${base}/api/questlog/pages/${encodeURIComponent(id)}/quests/${encodeURIComponent(key)}/complete`,
     { method: 'POST', headers: { accept: 'application/json' } },
   ).then(unwrap<{ key: string; status: string }>)
+
+export const abandonQuest = (id: string, key: string) =>
+  fetch(
+    `${base}/api/questlog/pages/${encodeURIComponent(id)}/quests/${encodeURIComponent(key)}/abandon`,
+    { method: 'POST', headers: { accept: 'application/json' } },
+  ).then(unwrap<{ key: string; status: string }>)
