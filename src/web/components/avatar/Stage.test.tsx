@@ -21,7 +21,7 @@ describe('Stage', () => {
 
     expect(screen.getByRole('img', { name: 'Spielfigur von Anna' })).toHaveTextContent('Figur wird geladen …')
     await waitFor(() => expect(stage.show).toHaveBeenCalled())
-    expect(vi.mocked(createStage).mock.calls[0]![1]).toMatch(/female\.glb/)
+    expect(vi.mocked(createStage).mock.calls[0]![1]).toBe('/avatar/female.glb')
     expect(vi.mocked(createStage).mock.calls[0]![2]).toBe(false)
     expect(stage.show).toHaveBeenLastCalledWith(new Set(['body', 'eyes', 'eyebrows', 'eyelashes', 'item_iron-helm']))
     expect(screen.queryByText('Figur wird geladen …')).not.toBeInTheDocument()
@@ -64,7 +64,8 @@ describe('Stage', () => {
 
     await waitFor(() => expect(second.show).toHaveBeenCalled())
     expect(first.dispose).toHaveBeenCalled()
-    expect(vi.mocked(createStage).mock.calls[1]![1]).toMatch(/female\.glb/)
+    expect(vi.mocked(createStage).mock.calls[0]![1]).toBe('/avatar/male.glb')
+    expect(vi.mocked(createStage).mock.calls[1]![1]).toBe('/avatar/female.glb')
     unmount()
     expect(second.dispose).toHaveBeenCalled()
   })

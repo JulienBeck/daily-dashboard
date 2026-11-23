@@ -3,18 +3,20 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 const apiTarget = process.env.API_TARGET ?? 'http://localhost:3399'
+const avatarTarget = process.env.AVATAR_TARGET ?? 'http://localhost:8089'
 
 export default defineConfig({
   base: process.env.BASE_PATH ?? '/',
   plugins: [react(), tailwindcss()],
   build: {
-    // three.js only loads with the character sheet; its lazy chunk is about 650 kB.
+    // three.js only loads with the character sheet; its lazy chunk is about 670 kB.
     chunkSizeWarningLimit: 700,
   },
   server: {
     port: 5180,
     proxy: {
       '/api': { target: apiTarget, changeOrigin: true },
+      '/avatar': { target: avatarTarget, changeOrigin: true },
     },
   },
 })

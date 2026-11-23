@@ -136,7 +136,8 @@ npm install
 npm run dev                   # http://localhost:5180
 ```
 
-`npm run dev` startet Vite und den Proxy gemeinsam. Vite leitet `/api` an `localhost:3399` weiter.
+`npm run dev` startet Vite und den Proxy gemeinsam. Vite leitet `/api` an `localhost:3399` weiter,
+`/avatar` an `localhost:8089` (siehe Spielfigur).
 
 Die `.env` wird über Nodes eingebautes `--env-file-if-exists` geladen — kein `dotenv`-Paket. Das
 hängt an den Skripten `dev:api` und `start`; wer den Proxy von Hand startet, muss das Flag selbst
@@ -148,7 +149,8 @@ mitgeben. Im Container ist es nicht nötig: dort kommen die Variablen aus Compos
 docker compose up --build     # http://localhost:8088
 ```
 
-Zwei Images: `Dockerfile.server` (Proxy) und `Dockerfile.web` (nginx mit dem gebauten Bundle).
+Zwei Images aus diesem Repository: `Dockerfile.server` (Proxy) und `Dockerfile.web` (nginx mit dem
+gebauten Bundle). Das dritte, `avatar`, kommt aus dem Nachbar-Repository `daily-dashboard-avatar`.
 `dashboard.config.json` ist gemountet, nicht eingebacken — Datei ändern, `docker compose restart api`,
 fertig. Die Tokens kommen aus `.env` neben der Compose-Datei.
 
@@ -178,7 +180,8 @@ wsl -d Ubuntu -- bash -lc 'cd /mnt/c/.../daily-dashboard && docker compose up -d
 
 `docker compose config` druckt die Tokens im Klartext; zum reinen Prüfen `-q` anhängen.
 
-Für einen späteren Cluster-Einsatz: `API_UPSTREAM` auf `<service>.<namespace>:3399` setzen,
+Für einen späteren Cluster-Einsatz: `API_UPSTREAM` auf `<service>.<namespace>:3399` und
+`AVATAR_UPSTREAM` auf `<service>.<namespace>:8080` setzen,
 `BASE_PATH` als Build-Argument, falls die Anwendung unter einem Unterpfad hängen soll.
 
 ## Konfiguration
@@ -531,26 +534,29 @@ Die Figur ist 3D (three.js, erst beim Öffnen des Profils geladen) und lässt si
 drehen. Sie atmet leicht und steht still, wenn das System reduzierte Bewegung verlangt. Je
 Körperbau gibt es ein GLB mit Skelett, Idle-Animation und allen 16 Gegenständen als eigene Meshes
 (`item_<id>`); angezeigt wird, was angelegt ist. Die Farben kommen zur Laufzeit aus dem Katalog
-(Materialien `<id>.primary` und `<id>.secondary`). Die Icons der Plätze sind ein Sprite-Sheet aus
-demselben Lauf.
+(Materialien `<id>.primary` und `<id>.secondary`). Dazu gibt es ein Icon je Gegenstand.
+
+Modelle und Icons baut Blender im eigenen Repository
+[daily-dashboard-avatar](https://github.com/JulienBeck/daily-dashboard-avatar). Sie kommen als
+eigenes Image und liegen für den Browser unter `/avatar/` — die nginx dieses Images leitet den
+Pfad an `AVATAR_UPSTREAM` weiter, so wie `/api/` an den Proxy.
 
 | Datei | Inhalt |
 |---|---|
-| `tools/avatar/build.py` | Blender-Skript: Grundkörper aus MPFB2 (MakeHuman), Kleidung als Schale über der Haut, Rüstung und Waffen als eigene Meshes am Skelett, Export, Icons |
-| `tools/avatar/build.sh` | baut alle drei Assets nach `src/web/components/avatar/assets/` |
-| `src/web/components/avatar/scene.ts` | three.js-Bühne: Licht, Kamera, Animation, Drehen |
+| `src/web/components/avatar/scene.ts` | three.js-Bühne: Licht, Kamera, Animation, Drehen, Meshopt-Decoder |
 | `src/web/components/avatar/wardrobe.ts` | welche Meshes sichtbar sind, welche Farbe ein Material bekommt |
+| `src/web/components/avatar/urls.ts` | `/avatar/<body>.glb` und `/avatar/icons/<id>.png` |
 
-Neu bauen, etwa nach einem neuen Gegenstand im Katalog (jeder Gegenstand braucht dazu eine
-Bauanleitung in `Wardrobe.BUILDERS`):
+Ein neuer Gegenstand im Katalog braucht im Avatar-Repository eine Bauanleitung und einen neuen
+Lauf. Bis dahin hat er weder Mesh noch Icon; das Profil funktioniert trotzdem.
 
-```sh
-BLENDER=/pfad/zu/blender tools/avatar/build.sh
-```
+| Umgebung | Woher `/avatar/` kommt |
+|---|---|
+| `npm run dev` | Vite leitet an `AVATAR_TARGET` weiter, Vorgabe `http://localhost:8089` — etwa `docker compose up avatar` |
+| `docker compose up` | Dienst `avatar`, gebaut aus `../daily-dashboard-avatar` (`AVATAR_SOURCE`) |
+| Cluster | Deployment `daily-dashboard-avatar`, siehe `daily-dashboard-kube` |
 
-Gebraucht werden Blender 4.5 LTS, das Addon MPFB2 und das Asset-Pack „makehuman_system_assets“
-(Haut, Augen, Haare) im MPFB-Datenordner. Der Code von MPFB steht unter GPL, seine Assets und
-die erzeugten Modelle unter CC0.
+Fehlt der Dienst, bleibt die Figur bei „3D-Ansicht nicht verfügbar“ und die Plätze ohne Icon.
 
 Die Tests laufen gegen ein echtes Postgres in WASM (PGlite, `src/server/rewards/memoryDb.ts`) —
 kein Docker nötig.

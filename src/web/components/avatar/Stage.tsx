@@ -1,11 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Body } from '../../../shared/avatar.js'
-import female from './assets/female.glb?url'
-import male from './assets/male.glb?url'
 import type { Stage as Handle } from './scene.js'
+import { modelUrl } from './urls.js'
 import { visibleParts, type Worn } from './wardrobe.js'
-
-const MODELS: Record<Body, string> = { male, female }
 
 const still = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 
@@ -20,7 +17,7 @@ export function Stage({ body, worn, title }: { body: Body; worn: Worn; title: st
     let made: Handle | null = null
     setState('loading')
     import('./scene.js')
-      .then((module) => module.createStage(canvas.current!, MODELS[body], still()))
+      .then((module) => module.createStage(canvas.current!, modelUrl(body), still()))
       .then((stage) => {
         made = stage
         if (!live) return stage.dispose()

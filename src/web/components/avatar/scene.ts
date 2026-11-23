@@ -17,6 +17,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three'
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js'
@@ -32,7 +33,7 @@ interface Model {
   animations: AnimationClip[]
 }
 
-const loader = new GLTFLoader()
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder)
 const models = new Map<string, Promise<Model>>()
 
 function load(url: string): Promise<Model> {
