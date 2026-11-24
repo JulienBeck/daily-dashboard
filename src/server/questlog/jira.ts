@@ -505,24 +505,38 @@ interface JiraUser {
   displayName?: string
 }
 
-/**
- * Accepting a quest means taking it: assign it to the caller and move it into
- * the running column. Jira has no single call for that, so it is two.
- */
+export interface JiraActor {
+  name?: string
+  accountId?: string
+  displayName?: string
+}
+
+const asUser = (flavor: Flavor, actor: JiraActor) =>
+  flavor === 'cloud' ? { accountId: actor.accountId } : { name: actor.name }
+
+async function actorOrSelf(
+  config: JiraConfig,
+  credentials: JiraCredentials,
+  flavor: Flavor,
+  deps: JiraDeps,
+  actor: JiraActor | undefined,
+): Promise<JiraActor> {
+  return actor ?? (await call<JiraUser>(config, credentials, flavor, deps, `/rest/api/${apiPath(flavor)}/myself`))
+}
+
 export async function acceptQuest(
   config: JiraConfig,
   credentials: JiraCredentials,
   deps: JiraDeps,
   key: string,
+  actor?: JiraActor,
 ): Promise<{ key: string; status: string | null; assignee: string }> {
   if (!isIssueKey(key)) throw new Error(`Not a Jira issue key: ${key}`)
   const flavor = await detectFlavor(config, deps)
   const version = apiPath(flavor)
 
-  const me = await call<JiraUser>(config, credentials, flavor, deps, `/rest/api/${version}/myself`)
-  // Data Center identifies a user by name, Cloud by accountId.
-  const body = flavor === 'cloud' ? { accountId: me.accountId } : { name: me.name }
-  await put(config, credentials, flavor, deps, `/rest/api/${version}/issue/${key}/assignee`, body)
+  const me = await actorOrSelf(config, credentials, flavor, deps, actor)
+  await put(config, credentials, flavor, deps, `/rest/api/${version}/issue/${key}/assignee`, asUser(flavor, me))
 
   const available = await transitionsOf(config, credentials, flavor, deps, key)
   const picked = pickTransition(available, config.doingStatusCategories)
@@ -580,13 +594,14 @@ export async function abandonQuest(
   credentials: JiraCredentials,
   deps: JiraDeps,
   key: string,
+  actor?: JiraActor,
 ): Promise<{ key: string; status: string }> {
   if (!isIssueKey(key)) throw new Error(`Not a Jira issue key: ${key}`)
   const flavor = await detectFlavor(config, deps)
   const version = apiPath(flavor)
 
   const [me, issue] = await Promise.all([
-    call<JiraUser>(config, credentials, flavor, deps, `/rest/api/${version}/myself`),
+    actorOrSelf(config, credentials, flavor, deps, actor),
     call<{ fields?: { assignee?: JiraUser | null } }>(
       config,
       credentials,
@@ -637,15 +652,12 @@ export function validateNewQuest(input: Partial<NewQuest>): NewQuest {
   }
 }
 
-/**
- * Reporter is left out on purpose: Jira stamps the token owner, so whoever runs
- * the questlog becomes the quest giver. Setting it needs "Modify Reporter".
- */
 export function createBody(
   page: PageConfig,
   quest: NewQuest,
   pointsField: string | null,
   flavor: Flavor,
+  reporter?: JiraActor,
 ): Record<string, unknown> {
   const create = page.create!
   const fields: Record<string, unknown> = {
@@ -654,6 +666,7 @@ export function createBody(
     summary: quest.title,
   }
   if (create.labels.length > 0) fields.labels = create.labels
+  if (reporter) fields.reporter = asUser(flavor, reporter)
   if (quest.priority) fields.priority = { name: quest.priority }
   if (pointsField && quest.points != null) fields[pointsField] = quest.points
   if (quest.description) {
@@ -678,6 +691,7 @@ export async function createQuest(
   credentials: JiraCredentials,
   deps: JiraDeps,
   input: Partial<NewQuest>,
+  reporter?: JiraActor,
 ): Promise<{ key: string; webUrl: string }> {
   if (!page.create) throw new Error(`The page "${page.title}" hands out no quests`)
   const quest = validateNewQuest(input)
@@ -690,7 +704,7 @@ export async function createQuest(
     flavor,
     deps,
     `/rest/api/${apiPath(flavor)}/issue`,
-    createBody(page, quest, points, flavor),
+    createBody(page, quest, points, flavor, reporter),
   )
   return { key: created.key, webUrl: `${config.baseUrl}/browse/${created.key}` }
 }

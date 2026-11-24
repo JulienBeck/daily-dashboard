@@ -1,6 +1,6 @@
 import type { Quest } from '../../shared/questlog/types.js'
 import type { Person } from '../../shared/rewards.js'
-import { avatarUrl } from '../jira.js'
+import { avatarUrl, userSearchPath } from '../jira.js'
 import type { JiraConfig } from '../questlog/config.js'
 import { apiPath, call, detectFlavor, type JiraCredentials, type JiraDeps } from '../questlog/jira.js'
 import {
@@ -17,20 +17,51 @@ export const USER_LIMIT = 10
 
 export interface Me extends Person {
   avatar: string | null
+  ref: Pick<JiraUserRef, 'name' | 'accountId'>
+}
+
+type JiraPerson = JiraUserRef & { emailAddress?: string; active?: boolean; avatarUrls?: Record<string, string> }
+
+function meOf(user: JiraPerson, baseUrl: string): Me | null {
+  const person = personOf(user)
+  if (!person) return null
+  const ref: Me['ref'] = {}
+  if (user.name) ref.name = user.name
+  if (user.accountId) ref.accountId = user.accountId
+  return { ...person, avatar: avatarUrl(user.avatarUrls, baseUrl), ref }
 }
 
 export async function fetchMe(config: JiraConfig, credentials: JiraCredentials, deps: JiraDeps): Promise<Me> {
   const flavor = await detectFlavor(config, deps)
-  const user = await call<JiraUserRef & { avatarUrls?: Record<string, string> }>(
-    config,
-    credentials,
-    flavor,
-    deps,
-    `/rest/api/${apiPath(flavor)}/myself`,
-  )
-  const person = personOf(user)
-  if (!person) throw new Error('Jira: kein Benutzer hinter dem Token')
-  return { ...person, avatar: avatarUrl(user.avatarUrls, config.baseUrl) }
+  const user = await call<JiraPerson>(config, credentials, flavor, deps, `/rest/api/${apiPath(flavor)}/myself`)
+  const me = meOf(user ?? {}, config.baseUrl)
+  if (!me) throw new Error('Jira: kein Benutzer hinter dem Token')
+  return me
+}
+
+const lower = (value: string | undefined) => (value ?? '').trim().toLowerCase()
+
+export async function fetchPerson(
+  config: JiraConfig,
+  credentials: JiraCredentials,
+  deps: JiraDeps,
+  email: string,
+): Promise<Me> {
+  const flavor = await detectFlavor(config, deps)
+  const wanted = lower(email)
+  const local = wanted.split('@')[0] ?? ''
+  for (const query of [...new Set([email.trim(), local])].filter(Boolean)) {
+    const found = await call<JiraPerson[]>(config, credentials, flavor, deps, userSearchPath(flavor, query)).catch(
+      () => [],
+    )
+    const hits = (Array.isArray(found) ? found : []).filter(
+      (user) => user.active !== false && (lower(user.emailAddress) === wanted || lower(user.name) === local),
+    )
+    if (hits.length > 1) throw new Error(`Jira: ${email} passt auf mehrere Benutzer`)
+    const me = hits.length === 1 ? meOf(hits[0]!, config.baseUrl) : null
+    if (me) return me
+  }
+  throw new Error(`Jira: kein Benutzer zu ${email}`)
 }
 
 interface IssueWithChangelog {

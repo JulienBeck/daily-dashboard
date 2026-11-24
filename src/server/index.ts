@@ -6,6 +6,7 @@ import { StaleCache } from './cache.js'
 import { fetchCalendar } from './calendar.js'
 import { forBoard, loadConfig } from './config.js'
 import { fetchMergeRequests, fetchPipelines } from './gitlab.js'
+import type { FastifyRequest } from 'fastify'
 import { viewerOf } from './identity.js'
 import {
   fetchAvatar,
@@ -29,6 +30,7 @@ import {
 } from './questlog/jira.js'
 import { postgres, retry } from './db.js'
 import { migrate } from './rewards/schema.js'
+import { createPeople } from './rewards/people.js'
 import { createRewards, parseBody, parseEquip, parseIds, parseShares, questOn, type Rewards } from './rewards/service.js'
 
 const config = loadConfig()
@@ -77,7 +79,9 @@ async function teamForBoard() {
   )
 }
 
-app.get('/api/me', async (request) => ({ viewer: viewerOf(request.headers, config.team) }))
+const viewerFor = (request: FastifyRequest) => viewerOf(request.headers, config.team)
+
+app.get('/api/me', async (request) => ({ viewer: viewerFor(request) }))
 
 app.get('/api/board', async () => ({
   team: await teamForBoard(),
@@ -222,7 +226,7 @@ const pagePayload = (page: PageConfig) =>
 
 function forgetQuestlogPages() {
   for (const page of config.questlog.pages) cache.invalidate(`questlog:${page.id}`)
-  cache.invalidate('profile')
+  cache.invalidatePrefix('profile:')
 }
 
 function afterQuestWrite() {
@@ -242,6 +246,15 @@ app.get('/api/questlog', async () => ({
   jiraBaseUrl: config.questlog.jira.baseUrl,
 }))
 
+const people = createPeople(config.questlog.jira, jiraCredentials, deps)
+
+async function actorFor(request: FastifyRequest) {
+  const viewer = viewerFor(request)
+  if (!viewer) return undefined
+  const person = await people.who(viewer)
+  return { ...person.ref, displayName: person.name }
+}
+
 const databaseUrl = process.env.DATABASE_URL ?? ''
 const db = databaseUrl ? postgres(databaseUrl) : null
 
@@ -258,6 +271,7 @@ const rewards: Rewards | null = db
         )
         return { start: payload.data.sprint.startDate, end: payload.data.sprint.endDate }
       },
+      people,
     })
   : null
 
@@ -268,39 +282,44 @@ const rewardsReady = () => {
   return rewards!
 }
 
-app.get('/api/profile', async () => {
+app.get('/api/profile', async (request) => {
   const service = rewardsReady()
-  return cache.get('profile', config.questlog.cacheSeconds.jira, () => service.profile())
+  const viewer = viewerFor(request)
+  return cache.get(`profile:${viewer?.email.toLowerCase() ?? ''}`, config.questlog.cacheSeconds.jira, () =>
+    service.profile(viewer),
+  )
 })
 
-app.get('/api/inbox', async () => rewardsReady().inbox())
+app.get('/api/inbox', async (request) => rewardsReady().inbox(viewerFor(request)))
 
 app.post<{ Body: { ids?: unknown } }>('/api/inbox/read', async (request) => {
-  await rewardsReady().markRead(parseIds(request.body?.ids))
+  await rewardsReady().markRead(parseIds(request.body?.ids), viewerFor(request))
   return { ok: true }
 })
 
 app.get<{ Params: { key: string } }>('/api/rewards/:key', async (request) => {
   guard(isIssueKey(request.params.key), 'Kein gültiger Jira-Schlüssel')
-  return rewardsReady().draft(request.params.key)
+  return rewardsReady().draft(request.params.key, viewerFor(request))
 })
 
 app.post<{ Params: { key: string }; Body: { shares?: unknown } }>('/api/rewards/:key', async (request) => {
   guard(isIssueKey(request.params.key), 'Kein gültiger Jira-Schlüssel')
   const service = rewardsReady()
-  const result = await service.distribute(request.params.key, parseShares(request.body?.shares))
-  cache.invalidate('profile')
+  const result = await service.distribute(request.params.key, parseShares(request.body?.shares), viewerFor(request))
+  cache.invalidatePrefix('profile:')
   return result
 })
 
-app.get('/api/equipment', async () => rewardsReady().equipment())
+app.get('/api/equipment', async (request) => rewardsReady().equipment(viewerFor(request)))
 
 app.post<{ Body: unknown }>('/api/equipment', async (request) => {
   const { item, equipped } = parseEquip(request.body)
-  return rewardsReady().equip(item, equipped)
+  return rewardsReady().equip(item, equipped, viewerFor(request))
 })
 
-app.post<{ Body: unknown }>('/api/body', async (request) => rewardsReady().chooseBody(parseBody(request.body)))
+app.post<{ Body: unknown }>('/api/body', async (request) =>
+  rewardsReady().chooseBody(parseBody(request.body), viewerFor(request)),
+)
 
 app.get<{ Querystring: { q?: string } }>('/api/users', async (request) =>
   rewardsReady().users(request.query.q ?? ''),
@@ -326,6 +345,7 @@ app.post<{ Params: { id: string }; Body: Partial<NewQuest> }>(
       jiraCredentials,
       deps,
       request.body ?? {},
+      await actorFor(request),
     )
     afterQuestWrite()
     reply.status(201)
@@ -338,7 +358,13 @@ app.post<{ Params: { id: string; key: string } }>(
   async (request) => {
     questlogPage(request.params.id)
     guard(isIssueKey(request.params.key), 'Kein gültiger Jira-Schlüssel')
-    const taken = await acceptQuest(config.questlog.jira, jiraCredentials, deps, request.params.key)
+    const taken = await acceptQuest(
+      config.questlog.jira,
+      jiraCredentials,
+      deps,
+      request.params.key,
+      await actorFor(request),
+    )
     afterQuestWrite()
     return taken
   },
@@ -366,7 +392,13 @@ app.post<{ Params: { id: string; key: string } }>(
     questlogPage(request.params.id)
     guard(isIssueKey(request.params.key), 'Kein gültiger Jira-Schlüssel')
     await rewards?.assertAbandonable(request.params.key)
-    const dropped = await abandonQuest(config.questlog.jira, jiraCredentials, deps, request.params.key)
+    const dropped = await abandonQuest(
+      config.questlog.jira,
+      jiraCredentials,
+      deps,
+      request.params.key,
+      await actorFor(request),
+    )
     await rewards?.withdraw(request.params.key)
     afterQuestWrite()
     return dropped

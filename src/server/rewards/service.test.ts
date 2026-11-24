@@ -3,6 +3,7 @@ import type { PagePayload, Quest } from '../../shared/questlog/types.js'
 import type { Db } from '../db.js'
 import type { JiraConfig } from '../questlog/config.js'
 import { memoryDb } from './memoryDb.js'
+import { createPeople } from './people.js'
 import {
   createRewards,
   dueDate,
@@ -100,7 +101,9 @@ function setup(over: { me?: object; resolved?: string; sprint?: SprintWindow | n
         },
       })
     }
-    if (url.pathname.endsWith('/user/search')) return json([anna])
+    if (url.pathname.endsWith('/user/search')) {
+      return json(url.searchParams.get('username') === 'gerd@x.test' ? [{ ...giver, emailAddress: 'gerd@x.test' }] : [anna])
+    }
     return new Response('nope', { status: 404 })
   }) as typeof globalThis.fetch
   const rewards = createRewards({
@@ -109,6 +112,7 @@ function setup(over: { me?: object; resolved?: string; sprint?: SprintWindow | n
     credentials: { token: 't', email: null },
     deps: { fetch, now: () => clock.now },
     sprint: async () => (over.sprint === undefined ? sprint : over.sprint),
+    people: createPeople(jira, { token: 't', email: null }, { fetch, now: () => clock.now }),
   })
   const issueCalls = () => calls.filter((url) => url.pathname.startsWith('/rest/api/2/issue/'))
   return { rewards, calls, issueCalls, clock, state }
@@ -187,7 +191,7 @@ describe('reward guards', () => {
   it('refuses a second hand-in once the reward is paid', async () => {
     const { rewards } = setup()
     await rewards.handIn(quest('PRO-1'))
-    await rewards.distribute('PRO-1', [{ id: 'JIRAUSER1', name: 'Anna Berg', share: 1 }])
+    await rewards.distribute('PRO-1', [{ id: 'JIRAUSER1', name: 'Anna Berg', share: 1 }], null)
 
     await expect(rewards.assertHandable('PRO-1')).rejects.toThrow('PRO-1 ist schon abgegeben und belohnt')
     await expect(rewards.assertAbandonable('PRO-1')).rejects.toThrow('PRO-1 ist schon belohnt')
@@ -220,10 +224,10 @@ describe('handIn', () => {
     await rewards.handIn(quest('PRO-1'))
 
     expect(issueCalls().map((url) => url.pathname)).toEqual(['/rest/api/2/issue/PRO-1'])
-    const draft = await rewards.draft('PRO-1')
+    const draft = await rewards.draft('PRO-1', null)
     expect(draft).toMatchObject({ dueAt: sprint.end, mayDistribute: true, giver: { id: 'JIRAUSER9' } })
     expect(draft.shares.map(({ id, share }) => ({ id, share }))).toEqual([{ id: 'JIRAUSER1', share: 1 }])
-    expect((await rewards.inbox()).messages.map((message) => message.kind)).toEqual(['distribute'])
+    expect((await rewards.inbox(null)).messages.map((message) => message.kind)).toEqual(['distribute'])
   })
 
   it('gives two weeks without a running sprint', async () => {
@@ -231,7 +235,7 @@ describe('handIn', () => {
 
     await rewards.handIn(quest('PRO-1'))
 
-    expect((await rewards.draft('PRO-1')).dueAt).toBe(dueDate(null, clock.now).toISOString())
+    expect((await rewards.draft('PRO-1', null)).dueAt).toBe(dueDate(null, clock.now).toISOString())
   })
 })
 
@@ -252,7 +256,7 @@ describe('sync', () => {
     clock.now = new Date('2026-11-21T00:00:00.000Z')
     await rewards.sync(true)
 
-    expect((await rewards.draft('PRO-1')).distributedBy).toBe('auto')
+    expect((await rewards.draft('PRO-1', null)).distributedBy).toBe('auto')
   })
 
   it('syncs at most once a minute unless forced', async () => {
@@ -264,11 +268,11 @@ describe('sync', () => {
     await rewards.sync()
     clock.now = new Date(due + 10_000)
     await rewards.sync()
-    expect((await rewards.draft('PRO-1')).distributedAt).toBeNull()
+    expect((await rewards.draft('PRO-1', null)).distributedAt).toBeNull()
 
     clock.now = new Date(due + SYNC_SECONDS * 1000)
     await rewards.sync()
-    expect((await rewards.draft('PRO-1')).distributedAt).not.toBeNull()
+    expect((await rewards.draft('PRO-1', null)).distributedAt).not.toBeNull()
   })
 })
 
@@ -277,10 +281,14 @@ describe('distribute', () => {
     const { rewards } = setup()
     await rewards.handIn(quest('PRO-1'))
 
-    const result = await rewards.distribute('PRO-1', [
-      { id: 'JIRAUSER1', name: 'Anna Berg', share: 1 },
-      { id: 'JIRAUSER2', name: 'Ben Cohn', share: 1 },
-    ])
+    const result = await rewards.distribute(
+      'PRO-1',
+      [
+        { id: 'JIRAUSER1', name: 'Anna Berg', share: 1 },
+        { id: 'JIRAUSER2', name: 'Ben Cohn', share: 1 },
+      ],
+      null,
+    )
 
     expect(result.distributedBy).toBe('JIRAUSER9')
     expect(result.shares.map(({ id, experience }) => ({ id, experience }))).toEqual([
@@ -289,11 +297,23 @@ describe('distribute', () => {
     ])
   })
 
+  it('lets the signed-in giver distribute although the token belongs to someone else', async () => {
+    const { rewards } = setup({ me: anna })
+    await rewards.handIn(quest('PRO-1'))
+    const gerd = { email: 'gerd@x.test', name: 'Gerd', member: 'Gerd' }
+
+    const result = await rewards.distribute('PRO-1', [{ id: 'JIRAUSER1', name: 'Anna', share: 1 }], gerd)
+
+    expect(result.distributedBy).toBe('JIRAUSER9')
+    expect((await rewards.inbox(gerd)).me).toEqual({ id: 'JIRAUSER9', name: 'Gerd Geber' })
+    expect((await rewards.inbox(null)).me.id).toBe('JIRAUSER1')
+  })
+
   it('refuses anybody but the giver', async () => {
     const { rewards } = setup({ me: anna })
     await rewards.handIn(quest('PRO-1'))
 
-    await expect(rewards.distribute('PRO-1', [{ id: 'JIRAUSER1', name: 'Anna', share: 1 }])).rejects.toThrow(
+    await expect(rewards.distribute('PRO-1', [{ id: 'JIRAUSER1', name: 'Anna', share: 1 }], null)).rejects.toThrow(
       'Nur Gerd Geber verteilt PRO-1',
     )
   })
@@ -302,9 +322,9 @@ describe('distribute', () => {
     const { rewards } = setup()
     await rewards.handIn(quest('PRO-1'))
 
-    await expect(rewards.distribute('PRO-1', [])).rejects.toThrow('Niemand zum Verteilen')
-    await rewards.distribute('PRO-1', [{ id: 'JIRAUSER1', name: 'Anna', share: 1 }])
-    await expect(rewards.distribute('PRO-1', [{ id: 'JIRAUSER1', name: 'Anna', share: 1 }])).rejects.toThrow(
+    await expect(rewards.distribute('PRO-1', [], null)).rejects.toThrow('Niemand zum Verteilen')
+    await rewards.distribute('PRO-1', [{ id: 'JIRAUSER1', name: 'Anna', share: 1 }], null)
+    await expect(rewards.distribute('PRO-1', [{ id: 'JIRAUSER1', name: 'Anna', share: 1 }], null)).rejects.toThrow(
       'bereits verteilt',
     )
   })
@@ -312,7 +332,7 @@ describe('distribute', () => {
   it('refuses a quest it never filed', async () => {
     const { rewards } = setup()
 
-    await expect(rewards.distribute('PRO-9', [{ id: 'a', name: 'a', share: 1 }])).rejects.toThrow(
+    await expect(rewards.distribute('PRO-9', [{ id: 'a', name: 'a', share: 1 }], null)).rejects.toThrow(
       'Keine Belohnung zu PRO-9',
     )
   })
@@ -322,7 +342,7 @@ describe('profile', () => {
   it('opens without searching Jira for old quests', async () => {
     const { rewards, calls } = setup({ me: anna })
 
-    const result = await rewards.profile()
+    const result = await rewards.profile(null)
 
     expect(calls.filter((url) => url.pathname.endsWith('/search'))).toEqual([])
     expect(result).toMatchObject({ experience: 0, completed: 0, pending: { quests: 0 } })
@@ -332,7 +352,7 @@ describe('profile', () => {
     const { rewards } = setup({ me: anna })
     await rewards.handIn(quest('PRO-1'))
 
-    const result = await rewards.profile()
+    const result = await rewards.profile(null)
 
     expect(result).toMatchObject({ name: 'Anna Berg', pending: { experience: 450, quests: 1 }, experience: 0 })
   })
@@ -342,12 +362,12 @@ describe('inbox', () => {
   it('names the reader and marks messages read', async () => {
     const { rewards } = setup()
     await rewards.handIn(quest('PRO-1'))
-    const before = await rewards.inbox()
+    const before = await rewards.inbox(null)
 
-    await rewards.markRead(before.messages.map((message) => message.id))
+    await rewards.markRead(before.messages.map((message) => message.id), null)
 
     expect(before.me).toEqual({ id: 'JIRAUSER9', name: 'Gerd Geber' })
-    expect((await rewards.inbox()).messages.map((message) => message.read)).toEqual([true])
+    expect((await rewards.inbox(null)).messages.map((message) => message.read)).toEqual([true])
   })
 })
 
@@ -380,7 +400,7 @@ describe('equipment', () => {
   it('dresses the player in the starter kit on first sight', async () => {
     const { rewards } = setup({ me: anna })
 
-    const result = await rewards.equipment()
+    const result = await rewards.equipment(null)
 
     expect(result.items.filter((item) => item.equipped).map((item) => item.id)).toContain('wool-hood')
     expect(result.items.find((item) => item.id === 'iron-helm')).toEqual({ id: 'iron-helm', equipped: false })
@@ -389,7 +409,7 @@ describe('equipment', () => {
   it('swaps an item in its slot', async () => {
     const { rewards } = setup({ me: anna })
 
-    const result = await rewards.equip('iron-helm', true)
+    const result = await rewards.equip('iron-helm', true, null)
 
     expect(result.items.find((item) => item.id === 'iron-helm')?.equipped).toBe(true)
     expect(result.items.find((item) => item.id === 'wool-hood')?.equipped).toBe(false)
@@ -398,15 +418,15 @@ describe('equipment', () => {
   it('starts every player as a man and remembers another body type', async () => {
     const { rewards } = setup({ me: anna })
 
-    expect((await rewards.equipment()).body).toBe('male')
-    expect((await rewards.chooseBody('female')).body).toBe('female')
-    expect((await rewards.equipment()).body).toBe('female')
-    expect((await rewards.equip('iron-helm', true)).body).toBe('female')
+    expect((await rewards.equipment(null)).body).toBe('male')
+    expect((await rewards.chooseBody('female', null)).body).toBe('female')
+    expect((await rewards.equipment(null)).body).toBe('female')
+    expect((await rewards.equip('iron-helm', true, null)).body).toBe('female')
   })
 
   it('refuses an item that does not exist', async () => {
     const { rewards } = setup({ me: anna })
 
-    await expect(rewards.equip('golden-crown', true)).rejects.toThrow('Unbekannter Gegenstand: golden-crown')
+    await expect(rewards.equip('golden-crown', true, null)).rejects.toThrow('Unbekannter Gegenstand: golden-crown')
   })
 })

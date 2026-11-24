@@ -99,6 +99,21 @@ describe('StaleCache', () => {
     expect(result.error).toBe('GitLab weg')
   })
 
+  it('drops every key under a prefix and nothing else', async () => {
+    const cache = new StaleCache(() => 0)
+    let loads = 0
+    const load = async () => ++loads
+    await cache.get('profile:a', 60, load)
+    await cache.get('profile:b', 60, load)
+    await cache.get('profiles', 60, load)
+
+    cache.invalidatePrefix('profile:')
+
+    expect((await cache.get('profile:a', 60, load)).data).toBe(4)
+    expect((await cache.get('profile:b', 60, load)).data).toBe(5)
+    expect((await cache.get('profiles', 60, load)).data).toBe(3)
+  })
+
   it('leaves the other keys alone when one is invalidated', async () => {
     const cache = new StaleCache(() => 1_000_000)
     await cache.get('a', 60, () => Promise.resolve(1))

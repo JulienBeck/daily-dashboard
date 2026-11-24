@@ -212,8 +212,8 @@ Den Header `X-Forwarded-Email` setzt **nur** oauth2-proxy. Schickt der Browser s
 überschreibt oauth2-proxy ihn mit dem angemeldeten Konto. Deshalb darf `web` keinen eigenen
 Port und keine eigene Ingress haben.
 
-Jira kennt die Anmeldung noch nicht: Annehmen, Abgeben und Anlegen laufen weiter mit dem einen
-`JIRA_TOKEN`, und Profil und Posteingang zeigen weiter dessen Besitzer.
+Mit Jira spricht das Board weiter über **einen** `JIRA_TOKEN`, aber im Namen der angemeldeten
+Person. Welche Jira-Person das ist, steht unter „Wer ist ‚ich‘?“ im Abschnitt zu den Belohnungen.
 
 Für einen späteren Cluster-Einsatz: `API_UPSTREAM` auf `<service>.<namespace>:3399` und
 `AVATAR_UPSTREAM` auf `<service>.<namespace>:8080` setzen,
@@ -545,9 +545,24 @@ im Dialog wie auf dem Server (`split` in `src/shared/rewards.ts`).
 **Abbrechen.** Gibt die Quest zurück: Status wieder offen, Zuweisung weg. Nach der Abgabe zieht
 Abbrechen auch die noch nicht verteilte Belohnung zurück, der Dialog warnt davor. Verteiltes bleibt.
 
-**Wer ist „ich“?** Bis es eine Anmeldung gibt, der Besitzer des `JIRA_TOKEN`. Verteilen darf nur,
-wer als Reporter der Quest eingetragen ist; der Posteingang zeigt also vorerst nur Quests, die
-der Token-Besitzer selbst vergeben hat.
+**Wer ist „ich“?** Die angemeldete Person (siehe „Anmeldung“). Der Proxy sucht mit dem
+`JIRA_TOKEN` den Jira-Benutzer zu ihrer E-Mail, erst nach der Adresse, dann nach dem Teil vor dem
+`@` als Benutzername. Es zählt **nur ein exakter, eindeutiger Treffer** auf E-Mail oder
+Benutzernamen. Ein Anzeigename, der bloß ähnlich ist, reicht nicht, denn mit dem Treffer handelt
+das Board in Jira. Der Treffer wird zehn Minuten je Adresse gemerkt (`src/server/rewards/people.ts`).
+Ohne Anmeldung, etwa bei `npm run dev`, ist es der Besitzer des Tokens.
+
+| Was | für wen |
+|---|---|
+| Profil, Posteingang, Ausrüstung, Körperbau | die angemeldete Person |
+| Verteilen | nur, wenn die angemeldete Person Reporter der Quest ist |
+| Quest annehmen / abbrechen | weist der angemeldeten Person zu bzw. prüft, ob es ihre ist |
+| Quest anlegen | setzt die angemeldete Person als Reporter, also als Questgeber |
+
+Der Token braucht dafür **Assign Issues** und **Modify Reporter** in den Projekten der Buchseiten
+und **Browse users** global. In Jiras Historie steht als Handelnder weiter der Token-Besitzer.
+Findet Jira zur Anmeldung niemanden, schlagen Profil und Schreibaktionen mit
+„Jira: kein Benutzer zu …“ fehl, statt still als Token-Besitzer zu handeln.
 
 | Tabelle | Inhalt |
 |---|---|

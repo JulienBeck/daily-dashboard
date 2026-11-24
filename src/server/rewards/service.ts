@@ -5,7 +5,9 @@ import type { Db } from '../db.js'
 import type { JiraConfig } from '../questlog/config.js'
 import type { JiraCredentials, JiraDeps } from '../questlog/jira.js'
 import { bodyOf, inventory, outfit, setBody, setEquipped } from './equipment.js'
-import { fetchMe, fetchQuestRecord, type Me, searchUsers } from './jira.js'
+import type { Viewer } from '../../shared/types.js'
+import { fetchQuestRecord, searchUsers } from './jira.js'
+import type { People } from './people.js'
 import {
   distribute,
   distributeDue,
@@ -18,7 +20,6 @@ import {
   withdraw,
 } from './store.js'
 
-export const ME_SECONDS = 600
 export const SYNC_SECONDS = 60
 export const FALLBACK_DUE_DAYS = 14
 const DAY = 86_400_000
@@ -34,6 +35,7 @@ export interface RewardsSetup {
   credentials: JiraCredentials
   deps: JiraDeps & { now: () => Date }
   sprint: () => Promise<SprintWindow | null>
+  people: People
 }
 
 export function questKeys(page: PagePayload): string[] {
@@ -54,18 +56,9 @@ export function dueDate(sprint: SprintWindow | null, now: Date): Date {
 }
 
 export function createRewards(setup: RewardsSetup) {
-  const { db, jira, credentials, deps } = setup
-  let me: { value: Me; at: number } | null = null
+  const { db, jira, credentials, deps, people } = setup
   let lastSync = 0
   let running: Promise<void> | null = null
-
-  async function currentUser(): Promise<Me> {
-    const now = deps.now().getTime()
-    if (!me || now - me.at > ME_SECONDS * 1000) {
-      me = { value: await fetchMe(jira, credentials, deps), at: now }
-    }
-    return me.value
-  }
 
   async function sync(): Promise<void> {
     await distributeDue(db, deps.now())
@@ -119,26 +112,26 @@ export function createRewards(setup: RewardsSetup) {
       return withdraw(db, key)
     },
 
-    async profile(): Promise<ProfilePayload> {
-      const user = await currentUser()
+    async profile(viewer: Viewer | null): Promise<ProfilePayload> {
+      const user = await people.who(viewer)
       await syncSoon()
       return profile(db, user, user.avatar)
     },
 
-    async inbox(): Promise<InboxPayload> {
-      const user = await currentUser()
+    async inbox(viewer: Viewer | null): Promise<InboxPayload> {
+      const user = await people.who(viewer)
       await syncSoon()
       return { me: { id: user.id, name: user.name }, messages: await inbox(db, user) }
     },
 
-    async draft(key: string): Promise<RewardDraft> {
-      const found = await draft(db, key, await currentUser())
+    async draft(key: string, viewer: Viewer | null): Promise<RewardDraft> {
+      const found = await draft(db, key, await people.who(viewer))
       if (!found) throw new Error(`Keine Belohnung zu ${key} hinterlegt`)
       return found
     },
 
-    async distribute(key: string, shares: readonly Weighted[]): Promise<RewardDraft> {
-      const user = await currentUser()
+    async distribute(key: string, shares: readonly Weighted[], viewer: Viewer | null): Promise<RewardDraft> {
+      const user = await people.who(viewer)
       const found = await draft(db, key, user)
       if (!found) throw new Error(`Keine Belohnung zu ${key} hinterlegt`)
       if (!found.mayDistribute) {
@@ -151,26 +144,26 @@ export function createRewards(setup: RewardsSetup) {
       return (await draft(db, key, user))!
     },
 
-    async markRead(ids: readonly number[]): Promise<void> {
-      await markRead(db, await currentUser(), ids, deps.now())
+    async markRead(ids: readonly number[], viewer: Viewer | null): Promise<void> {
+      await markRead(db, await people.who(viewer), ids, deps.now())
     },
 
-    async equipment(): Promise<EquipmentPayload> {
-      const user = await currentUser()
+    async equipment(viewer: Viewer | null): Promise<EquipmentPayload> {
+      const user = await people.who(viewer)
       await outfit(db, user, STARTER, deps.now())
       return dressed(user.id)
     },
 
-    async chooseBody(body: Body): Promise<EquipmentPayload> {
-      const user = await currentUser()
+    async chooseBody(body: Body, viewer: Viewer | null): Promise<EquipmentPayload> {
+      const user = await people.who(viewer)
       await outfit(db, user, STARTER, deps.now())
       await setBody(db, user.id, body)
       return dressed(user.id)
     },
 
-    async equip(itemId: string, equipped: boolean): Promise<EquipmentPayload> {
+    async equip(itemId: string, equipped: boolean, viewer: Viewer | null): Promise<EquipmentPayload> {
       if (!itemById(itemId)) throw new Error(`Unbekannter Gegenstand: ${itemId}`)
-      const user = await currentUser()
+      const user = await people.who(viewer)
       await outfit(db, user, STARTER, deps.now())
       await setEquipped(db, user.id, itemId, sameSlot(itemId), equipped)
       return dressed(user.id)

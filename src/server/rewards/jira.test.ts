@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Quest } from '../../shared/questlog/types.js'
 import type { JiraConfig } from '../questlog/config.js'
-import { fetchMe, fetchQuestRecord, searchUsers, USER_LIMIT } from './jira.js'
+import { fetchMe, fetchPerson, fetchQuestRecord, searchUsers, USER_LIMIT } from './jira.js'
 
 const jira: JiraConfig = {
   baseUrl: 'https://jira.test',
@@ -66,6 +66,7 @@ describe('fetchMe', () => {
       id: 'JIRAUSER1',
       name: 'Anna Berg',
       avatar: `/api/avatar?url=${encodeURIComponent('https://jira.test/a.png')}`,
+      ref: { name: 'aberg' },
     })
   })
 
@@ -162,5 +163,53 @@ describe('searchUsers', () => {
     const { deps, config } = fake(() => ({ message: 'proxy' }))
 
     expect(await searchUsers(config, credentials, deps, 'anna')).toEqual([])
+  })
+})
+
+describe('fetchPerson', () => {
+  const daniel = { key: 'JIRAUSER4', name: 'D.Dietrich', displayName: 'Daniel Dietrich', emailAddress: 'D.Dietrich@ceyoniq.com' }
+
+  it('takes the one user whose address matches the login, whatever its case', async () => {
+    const { calls, deps, config } = fake(() => [daniel])
+
+    expect(await fetchPerson(config, credentials, deps, 'd.dietrich@ceyoniq.com')).toEqual({
+      id: 'JIRAUSER4',
+      name: 'Daniel Dietrich',
+      avatar: null,
+      ref: { name: 'D.Dietrich' },
+    })
+    expect(calls[0]!.searchParams.get('username')).toBe('d.dietrich@ceyoniq.com')
+  })
+
+  it('falls back to the username when Jira hides the address', async () => {
+    const hidden = { ...daniel, emailAddress: undefined }
+    const { calls, deps, config } = fake((url) => (url.searchParams.get('username') === 'd.dietrich' ? [hidden] : []))
+
+    expect((await fetchPerson(config, credentials, deps, 'D.Dietrich@ceyoniq.com')).id).toBe('JIRAUSER4')
+    expect(calls.map((url) => url.searchParams.get('username'))).toEqual(['D.Dietrich@ceyoniq.com', 'd.dietrich'])
+  })
+
+  it('never settles for a lone hit that only resembles the login', async () => {
+    const { deps, config } = fake(() => [{ key: 'JIRAUSER5', name: 'dirk', displayName: 'D. Dietrich' }])
+
+    await expect(fetchPerson(config, credentials, deps, 'd.dietrich@ceyoniq.com')).rejects.toThrow('kein Benutzer')
+  })
+
+  it('refuses a login that fits two users', async () => {
+    const { deps, config } = fake(() => [daniel, { ...daniel, key: 'JIRAUSER6' }])
+
+    await expect(fetchPerson(config, credentials, deps, 'd.dietrich@ceyoniq.com')).rejects.toThrow('mehrere Benutzer')
+  })
+
+  it('skips deactivated accounts', async () => {
+    const { deps, config } = fake(() => [{ ...daniel, active: false }])
+
+    await expect(fetchPerson(config, credentials, deps, 'd.dietrich@ceyoniq.com')).rejects.toThrow('kein Benutzer')
+  })
+
+  it('names the Cloud account by its accountId', async () => {
+    const { deps, config } = fake(() => [{ accountId: 'acc-7', displayName: 'Daniel', emailAddress: 'd@x.test' }], 'cloud')
+
+    expect((await fetchPerson(config, credentials, deps, 'd@x.test')).ref).toEqual({ accountId: 'acc-7' })
   })
 })

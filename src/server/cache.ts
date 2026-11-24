@@ -15,6 +15,12 @@ export class StaleCache {
     this.entries.delete(key)
   }
 
+  invalidatePrefix(prefix: string): void {
+    for (const key of [...this.entries.keys()]) {
+      if (key.startsWith(prefix)) this.entries.delete(key)
+    }
+  }
+
   async get<T>(key: string, ttlSeconds: number, load: () => Promise<T>): Promise<Payload<T>> {
     const entry = this.entries.get(key) as Entry<T> | undefined
     const fresh = entry && this.now() - entry.fetchedAt < ttlSeconds * 1000

@@ -443,7 +443,7 @@ describe('createBody', () => {
     expect(body.fields.description.content).toHaveLength(2)
   })
 
-  it('never sets a reporter — Jira stamps the token owner', () => {
+  it('leaves the reporter to Jira when nobody is signed in', () => {
     const body = createBody(page, quest, null, 'server') as any
     expect(body.fields.reporter).toBeUndefined()
     expect(body.fields.customfield_1).toBeUndefined()
@@ -972,5 +972,72 @@ describe('createQuest', () => {
         title: 'Hilf mir',
       }),
     ).rejects.toThrow(/issuetype is required/)
+  })
+})
+
+describe('acting for the signed-in person', () => {
+  const credentials = { token: 't', email: null }
+  const fetching = (assignee: unknown = null) =>
+    vi.fn(async (url: string, init?: any) => {
+      if (url.endsWith('/myself')) return ok({ name: 'jbeck', accountId: 'acc-1', displayName: 'Julien Beck' })
+      if (url.endsWith('?fields=assignee')) return ok({ fields: { assignee } })
+      if (url.endsWith('/transitions') && init?.method !== 'POST') {
+        return ok({
+          transitions: [
+            { id: '7', name: 'Start', to: { name: 'In Progress', statusCategory: { key: 'indeterminate' } } },
+            { id: '11', name: 'Reopen', to: { name: 'Open', statusCategory: { key: 'new' } } },
+          ],
+        })
+      }
+      return { ok: true, status: 204, json: async () => ({}), text: async () => '' }
+    })
+  const bodyOf = (fetchMock: ReturnType<typeof fetching>, suffix: string) =>
+    JSON.parse((fetchMock.mock.calls.find(([url]) => url.endsWith(suffix))![1] as any).body)
+  const asked = (fetchMock: ReturnType<typeof fetching>) => fetchMock.mock.calls.map(([url]) => url)
+  const dietrich = { name: 'D.Dietrich', displayName: 'Daniel Dietrich' }
+
+  it('assigns an accepted quest to that person instead of the token owner', async () => {
+    const fetchMock = fetching()
+
+    const taken = await acceptQuest(jira, credentials, { fetch: fetchMock as any }, 'PRO-42', dietrich)
+
+    expect(bodyOf(fetchMock, '/assignee')).toEqual({ name: 'D.Dietrich' })
+    expect(taken.assignee).toBe('Daniel Dietrich')
+    expect(asked(fetchMock).some((url) => url.endsWith('/myself'))).toBe(false)
+  })
+
+  it('assigns by accountId on Cloud', async () => {
+    const fetchMock = fetching()
+
+    await acceptQuest({ ...jira, flavor: 'cloud' }, credentials, { fetch: fetchMock as any }, 'PRO-42', {
+      accountId: 'acc-7',
+    })
+
+    expect(bodyOf(fetchMock, '/assignee')).toEqual({ accountId: 'acc-7' })
+  })
+
+  it('lets that person abandon their own quest', async () => {
+    const fetchMock = fetching({ name: 'D.Dietrich' })
+
+    await expect(
+      abandonQuest(jira, credentials, { fetch: fetchMock as any }, 'PRO-42', dietrich),
+    ).resolves.toEqual({ key: 'PRO-42', status: 'Open' })
+  })
+
+  it('refuses to abandon a quest of the token owner on behalf of someone else', async () => {
+    const fetchMock = fetching({ name: 'jbeck', displayName: 'Julien Beck' })
+
+    await expect(
+      abandonQuest(jira, credentials, { fetch: fetchMock as any }, 'PRO-42', dietrich),
+    ).rejects.toThrow('belongs to Julien Beck')
+  })
+
+  it('makes that person the giver of a new quest', () => {
+    const quest = { title: 'Hilf mir', description: '', points: null, priority: null }
+
+    expect((createBody(page, quest, null, 'server', dietrich) as any).fields.reporter).toEqual({ name: 'D.Dietrich' })
+    expect((createBody(page, quest, null, 'cloud', { accountId: 'acc-7' }) as any).fields.reporter).toEqual({
+      accountId: 'acc-7',
+    })
   })
 })
