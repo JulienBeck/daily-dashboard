@@ -17,6 +17,7 @@ import {
   getMergeRequests,
   getPipelines,
   getInbox,
+  getMe,
   getProfile,
   markRead,
   getSprint,
@@ -88,6 +89,7 @@ export function App() {
   const epics = usePolled(useCallback(() => getEpics(), []), refresh * 5)
   const burndown = usePolled(useCallback(() => getBurndown(), []), refresh * 5)
   const profile = usePolled(useCallback(() => getProfile(), []), refresh * 5)
+  const me = usePolled(useCallback(() => getMe(), []), 600)
   const inbox = usePolled(useCallback(() => getInbox(), []), refresh)
 
   const season = forced ?? seasonFor(clock)
@@ -246,7 +248,12 @@ export function App() {
       <SeasonDecor season={season.key} />
 
       {profileOpen ? (
-        <ProfileWindow profile={profile.value?.data ?? null} error={profile.error} onClose={closeProfile} />
+        <ProfileWindow
+          profile={profile.value?.data ?? null}
+          error={profile.error}
+          viewer={me.value?.viewer ?? null}
+          onClose={closeProfile}
+        />
       ) : null}
 
       {inboxOpen ? (

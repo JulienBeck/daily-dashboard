@@ -6,6 +6,7 @@ import { StaleCache } from './cache.js'
 import { fetchCalendar } from './calendar.js'
 import { forBoard, loadConfig } from './config.js'
 import { fetchMergeRequests, fetchPipelines } from './gitlab.js'
+import { viewerOf } from './identity.js'
 import {
   fetchAvatar,
   fetchEpics,
@@ -75,6 +76,8 @@ async function teamForBoard() {
     ),
   )
 }
+
+app.get('/api/me', async (request) => ({ viewer: viewerOf(request.headers, config.team) }))
 
 app.get('/api/board', async () => ({
   team: await teamForBoard(),

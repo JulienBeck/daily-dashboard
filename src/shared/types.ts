@@ -102,6 +102,12 @@ export interface TeamMember {
   nextAway: UpcomingAbsence | null
 }
 
+export interface Viewer {
+  email: string
+  name: string
+  member: string | null
+}
+
 export interface CalendarEntry {
   summary: string
   start: string

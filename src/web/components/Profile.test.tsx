@@ -195,3 +195,31 @@ describe('ProfileWindow layout', () => {
     expect(sheet.className).toContain('min-h-0')
   })
 })
+
+describe('ProfileWindow login', () => {
+  it('says who is signed in and offers to sign out', () => {
+    render(
+      <ProfileWindow
+        profile={profile()}
+        error={null}
+        viewer={{ email: 'j.beck@ceyoniq.com', name: 'Julien', member: 'Julien' }}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText(/Angemeldet als/)).toHaveTextContent('Angemeldet als Julien · Abmelden')
+    expect(screen.getByRole('link', { name: 'Abmelden' })).toHaveAttribute('href', '/oauth2/sign_out?rd=%2F')
+  })
+
+  it('marks a login that belongs to nobody in the team', () => {
+    render(<ProfileWindow profile={profile()} error={null} viewer={{ email: 'g@x', name: 'gast', member: null }} onClose={vi.fn()} />)
+
+    expect(screen.getByText(/Angemeldet als/)).toHaveTextContent('Angemeldet als gast (nicht im Team) · Abmelden')
+  })
+
+  it('shows no login line where there is no login, as in plain npm run dev', () => {
+    windowWith(profile())
+
+    expect(screen.queryByText(/Angemeldet als/)).not.toBeInTheDocument()
+  })
+})

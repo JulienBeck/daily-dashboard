@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { formatNumber } from '../../shared/questlog/quest.js'
 import type { Coins, Difficulty, ProfilePayload } from '../../shared/questlog/types.js'
+import type { Viewer } from '../../shared/types.js'
+import { signOutUrl } from '../api.js'
 import { CharacterSheet } from './avatar/CharacterSheet.js'
 import { Window } from './Window.js'
 
@@ -92,10 +94,12 @@ function Stat({ label, children }: { label: string; children: ReactNode }) {
 export function ProfileWindow({
   profile,
   error,
+  viewer = null,
   onClose,
 }: {
   profile: ProfilePayload | null
   error: string | null
+  viewer?: Viewer | null
   onClose: () => void
 }) {
   return (
@@ -117,6 +121,15 @@ export function ProfileWindow({
             ) : (
               <p className="m-0 mt-1 text-[12px] text-muted">Profil wird geladen …</p>
             )}
+            {viewer ? (
+              <p className="m-0 mt-1 text-[11px] text-muted">
+                Angemeldet als <span className="text-ink-2">{viewer.name}</span>
+                {viewer.member ? null : ' (nicht im Team)'} ·{' '}
+                <a href={signOutUrl} className="text-ink-2 underline">
+                  Abmelden
+                </a>
+              </p>
+            ) : null}
           </div>
         </div>
 

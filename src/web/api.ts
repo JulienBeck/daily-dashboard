@@ -9,6 +9,7 @@ import type {
   PipelineRow,
   SprintInfo,
   TeamMember,
+  Viewer,
 } from '../shared/types.js'
 import type { Body, EquipmentPayload } from '../shared/avatar.js'
 import type { ProfilePayload } from '../shared/questlog/types.js'
@@ -55,6 +56,8 @@ export const getCommits = () => get<Payload<CommitsPayload>>('/commits')
 export const getCalendar = () => get<Payload<CalendarByMember>>('/calendar')
 export const getEpics = () => get<Payload<EpicsPayload>>('/epics')
 export const getBurndown = () => get<Payload<BurndownPayload>>('/burndown')
+export const getMe = () => get<{ viewer: Viewer | null }>('/me')
+export const signOutUrl = `${base}/oauth2/sign_out?rd=${encodeURIComponent(`${base}/`)}`
 export const getProfile = () => get<Payload<ProfilePayload>>('/profile')
 export const getInbox = () => get<InboxPayload>('/inbox')
 export const markRead = (ids: number[]) => post<{ ok: boolean }>('/inbox/read', { ids })

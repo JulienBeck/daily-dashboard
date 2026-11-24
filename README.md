@@ -28,7 +28,7 @@ die ehrlichere Vereinfachung, die Scope-Änderung steht als Zahl daneben.
 ```
 Browser (SPA, kein Token)
    │  /api/board /api/pipelines /api/mrs /api/sprint /api/epics
-   │  /api/commits /api/calendar /api/avatar /api/burndown
+   │  /api/commits /api/calendar /api/avatar /api/burndown /api/me
    │  POST /api/issues/<key>/lane
    │  /api/questlog /api/questlog/pages/<id> (+ POST quests, accept, complete)
    ▼
@@ -179,6 +179,41 @@ wsl -d Ubuntu -- bash -lc 'cd /mnt/c/.../daily-dashboard && docker compose up -d
 ```
 
 `docker compose config` druckt die Tokens im Klartext; zum reinen Prüfen `-q` anhängen.
+
+### Anmeldung
+
+Das Board steht hinter **Keycloak und oauth2-proxy**. Port 8088 gehört dem oauth2-proxy, `web`
+hat keinen eigenen Port mehr. Wer nicht angemeldet ist, landet auf der Keycloak-Anmeldung.
+
+```
+Browser ─► oauth2-proxy :8088 ─┬─ /auth/…  ─► keycloak   (Anmeldeseiten ohne Login, Admin-Konsole nur mit)
+                               └─ alles andere ─► web ─► api   (+ X-Forwarded-Email)
+```
+
+| Was | Wert lokal |
+|---|---|
+| Anmeldung | Ein Konto je Eintrag in `team` der gemounteten Config, angelegt vom Einweg-Dienst `dev-users` (`auth/dev-users.mjs`). Benutzername und Kennwort sind der Name in Kleinbuchstaben, also `alice`/`alice` |
+| Admin-Konsole | <http://localhost:8088/auth/admin>, `admin`/`admin`, erst nach einer Board-Anmeldung erreichbar |
+| Realm | `auth/daily-dashboard-realm.json`, dieselbe Datei rollt `daily-dashboard-kube` aus. Kein Host und kein Geheimnis darin, beides füllt Keycloak beim Import aus `DASHBOARD_URL` und `KC_CLIENT_SECRET` |
+| Sitzung | 30 Tage im Realm, oauth2-proxy-Cookie 7 Tage mit stündlicher Auffrischung, damit der Wandbildschirm angemeldet bleibt |
+
+Keycloak hängt unter `/auth` am **selben Origin** wie das Board. Browser und Container sehen damit
+dieselbe Issuer-Adresse. Den Code löst oauth2-proxy direkt bei `keycloak:8080` ein
+(`OAUTH2_PROXY_REDEEM_URL`), ohne den Umweg über `localhost`, das im Container der Container selbst
+wäre.
+
+**Wer bin ich?** `GET /api/me` liefert `{ viewer: { email, name, member } }`. `member` ist der
+`team`-Eintrag mit derselben E-Mail (Groß- und Kleinschreibung egal) oder `null`. Ohne
+oauth2-proxy davor, etwa bei `npm run dev`, ist `viewer` `null`. Das Profilfenster zeigt
+„Angemeldet als …“ und „Abmelden“. Abmelden beendet auch die Keycloak-Sitzung
+(`OAUTH2_PROXY_BACKEND_LOGOUT_URL`).
+
+Den Header `X-Forwarded-Email` setzt **nur** oauth2-proxy. Schickt der Browser selbst einen,
+überschreibt oauth2-proxy ihn mit dem angemeldeten Konto. Deshalb darf `web` keinen eigenen
+Port und keine eigene Ingress haben.
+
+Jira kennt die Anmeldung noch nicht: Annehmen, Abgeben und Anlegen laufen weiter mit dem einen
+`JIRA_TOKEN`, und Profil und Posteingang zeigen weiter dessen Besitzer.
 
 Für einen späteren Cluster-Einsatz: `API_UPSTREAM` auf `<service>.<namespace>:3399` und
 `AVATAR_UPSTREAM` auf `<service>.<namespace>:8080` setzen,

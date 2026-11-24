@@ -1,0 +1,44 @@
+{
+  "realm": "daily-dashboard",
+  "displayName": "Daily-Dashboard",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "rememberMe": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "internationalizationEnabled": true,
+  "supportedLocales": ["de", "en"],
+  "defaultLocale": "de",
+  "ssoSessionIdleTimeout": 2592000,
+  "ssoSessionMaxLifespan": 2592000,
+  "ssoSessionIdleTimeoutRememberMe": 2592000,
+  "ssoSessionMaxLifespanRememberMe": 2592000,
+  "bruteForceProtected": true,
+  "clients": [
+    {
+      "clientId": "daily-dashboard",
+      "name": "Daily-Dashboard",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${KC_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "rootUrl": "${DASHBOARD_URL}",
+      "baseUrl": "${DASHBOARD_URL}/",
+      "redirectUris": ["${DASHBOARD_URL}/oauth2/callback"],
+      "webOrigins": ["${DASHBOARD_URL}"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "${DASHBOARD_URL}/*"
+      },
+      "defaultClientScopes": ["profile", "email", "roles", "web-origins", "basic"],
+      "optionalClientScopes": []
+    }
+  ]
+}
