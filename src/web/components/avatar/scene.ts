@@ -1,5 +1,6 @@
 import {
   ACESFilmicToneMapping,
+  type AnimationAction,
   type AnimationClip,
   AnimationMixer,
   Box3,
@@ -21,10 +22,11 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js'
-import { tint } from './wardrobe.js'
+import { hold } from './pose.js'
+import { type Hand, tint } from './wardrobe.js'
 
 export interface Stage {
-  show(parts: ReadonlySet<string>): void
+  show(parts: ReadonlySet<string>, hands: ReadonlySet<Hand>): void
   dispose(): void
 }
 
@@ -109,11 +111,27 @@ function stage(renderer: WebGLRenderer, canvas: HTMLCanvasElement, model: Model,
 
   const mixer = new AnimationMixer(figure)
   const idle = model.animations.find((clip) => clip.name === 'idle')
-  if (idle) {
-    const action = mixer.clipAction(idle).play()
-    action.paused = still
+  const grip = model.animations.find((clip) => clip.name === 'grip')
+  let actions: AnimationAction[] = []
+  let held: string | null = null
+  const pose = (hands: ReadonlySet<Hand>) => {
+    const key = [...hands].sort().join('')
+    if (!idle || key === held) return
+    held = key
+    const time = actions[0]?.time ?? 0
+    for (const action of actions) {
+      action.stop()
+      mixer.uncacheAction(action.getClip())
+    }
+    actions = hold(idle, grip, hands).map((clip) => {
+      const action = mixer.clipAction(clip)
+      action.time = time
+      action.paused = still
+      return action.play()
+    })
     mixer.update(0)
   }
+  pose(new Set())
 
   let turn = 0
   let dragging: number | null = null
@@ -150,10 +168,11 @@ function stage(renderer: WebGLRenderer, canvas: HTMLCanvasElement, model: Model,
   draw()
 
   return {
-    show(parts) {
+    show(parts, hands) {
       figure.traverse((node) => {
         if ((node as Mesh).isMesh) node.visible = parts.has(node.name) || parts.has(node.parent?.name ?? '')
       })
+      pose(hands)
     },
     dispose() {
       cancelAnimationFrame(frame)

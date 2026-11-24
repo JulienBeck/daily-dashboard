@@ -178,3 +178,20 @@ describe('ProfileWindow', () => {
     expect(onClose).toHaveBeenCalledTimes(3)
   })
 })
+
+describe('ProfileWindow layout', () => {
+  it('caps the row of both columns at the window height, so a long history scrolls inside', () => {
+    windowWith(profile())
+
+    expect(screen.getByRole('dialog').className).toContain('grid-rows-[minmax(0,1fr)]')
+    expect(screen.getByRole('link', { name: /PRO-3990/ }).closest('ul')!.className).toContain('scroller')
+  })
+
+  it('lets the equipment column scroll when an open slot list makes it taller than the window', () => {
+    windowWith(profile())
+    const sheet = screen.getByRole('region', { name: 'Ausrüstung' })
+
+    expect(sheet.className).toContain('scroller')
+    expect(sheet.className).toContain('min-h-0')
+  })
+})

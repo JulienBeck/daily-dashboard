@@ -100,7 +100,7 @@ export function CharacterSheet({ name }: { name: string }) {
     ))
 
   return (
-    <section aria-label="Ausrüstung" className="grid content-start gap-3">
+    <section aria-label="Ausrüstung" className="scroller grid min-h-0 content-start gap-3 pr-1">
       <div role="radiogroup" aria-label="Körperbau" className="flex justify-center gap-2">
         {BODIES.map((entry) => (
           <button

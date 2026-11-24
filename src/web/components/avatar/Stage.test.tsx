@@ -23,7 +23,7 @@ describe('Stage', () => {
     await waitFor(() => expect(stage.show).toHaveBeenCalled())
     expect(vi.mocked(createStage).mock.calls[0]![1]).toBe('/avatar/female.glb')
     expect(vi.mocked(createStage).mock.calls[0]![2]).toBe(false)
-    expect(stage.show).toHaveBeenLastCalledWith(new Set(['body', 'eyes', 'eyebrows', 'eyelashes', 'item_iron-helm']))
+    expect(stage.show).toHaveBeenLastCalledWith(new Set(['body', 'eyes', 'eyebrows', 'eyelashes', 'item_iron-helm']), new Set())
     expect(screen.queryByText('Figur wird geladen …')).not.toBeInTheDocument()
   })
 
@@ -49,8 +49,20 @@ describe('Stage', () => {
     rerender(<Stage body="male" worn={{ chest: itemById('chain-mail') }} title="x" />)
 
     await waitFor(() => expect(stage.show).toHaveBeenCalledTimes(2))
-    expect(stage.show).toHaveBeenLastCalledWith(new Set(['body', 'eyes', 'eyebrows', 'eyelashes', 'hair', 'item_chain-mail']))
+    expect(stage.show).toHaveBeenLastCalledWith(new Set(['body', 'eyes', 'eyebrows', 'eyelashes', 'hair', 'item_chain-mail']), new Set())
     expect(createStage).toHaveBeenCalledTimes(1)
+  })
+
+  it('closes the hands that take up a weapon', async () => {
+    const stage = handle()
+    vi.mocked(createStage).mockResolvedValue(stage)
+    const { rerender } = render(<Stage body="male" worn={{}} title="x" />)
+    await waitFor(() => expect(stage.show).toHaveBeenCalledTimes(1))
+
+    rerender(<Stage body="male" worn={{ mainHand: itemById('short-sword'), offHand: itemById('wooden-shield') }} title="x" />)
+
+    await waitFor(() => expect(stage.show).toHaveBeenCalledTimes(2))
+    expect(stage.show.mock.lastCall![1]).toEqual(new Set(['l', 'r']))
   })
 
   it('swaps the model when the body changes and lets go of the old one', async () => {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Body } from '../../../shared/avatar.js'
 import type { Stage as Handle } from './scene.js'
 import { modelUrl } from './urls.js'
-import { visibleParts, type Worn } from './wardrobe.js'
+import { type Hand, holding, visibleParts, type Worn } from './wardrobe.js'
 
 const still = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 
@@ -11,6 +11,7 @@ export function Stage({ body, worn, title }: { body: Body; worn: Worn; title: st
   const handle = useRef<Handle | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'failed'>('loading')
   const parts = [...visibleParts(worn)].sort().join(' ')
+  const hands = [...holding(worn)].sort().join('')
 
   useEffect(() => {
     let live = true
@@ -33,8 +34,8 @@ export function Stage({ body, worn, title }: { body: Body; worn: Worn; title: st
   }, [body])
 
   useEffect(() => {
-    if (state === 'ready') handle.current?.show(new Set(parts.split(' ')))
-  }, [parts, state])
+    if (state === 'ready') handle.current?.show(new Set(parts.split(' ')), new Set(hands.split('') as Hand[]))
+  }, [parts, hands, state])
 
   return (
     <div role="img" aria-label={title} className="relative size-full">

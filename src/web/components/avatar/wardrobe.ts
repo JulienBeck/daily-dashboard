@@ -13,6 +13,15 @@ export function visibleParts(worn: Worn): Set<string> {
   return parts
 }
 
+export type Hand = 'l' | 'r'
+
+export function holding(worn: Worn): Set<Hand> {
+  const hands = new Set<Hand>()
+  if (worn.mainHand) hands.add('r')
+  if (worn.offHand) hands.add('l')
+  return hands
+}
+
 export function tint(material: string): string | undefined {
   const match = /^(.+)\.(primary|secondary)$/.exec(material)
   if (!match) return undefined

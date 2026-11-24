@@ -99,7 +99,7 @@ export function ProfileWindow({
   onClose: () => void
 }) {
   return (
-    <Window label="Profil" onClose={onClose} wide className="grid grid-cols-[minmax(0,400px)_minmax(0,1fr)] gap-6">
+    <Window label="Profil" onClose={onClose} wide className="grid grid-cols-[minmax(0,400px)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-6">
       <CharacterSheet name={profile?.name ?? 'dir'} />
       <div className="grid min-h-0 grid-rows-[auto_auto_auto_1fr] gap-4">
         <div className="grid grid-cols-[auto_1fr] items-center gap-4">

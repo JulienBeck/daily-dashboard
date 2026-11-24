@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { itemById, worn } from '../../../shared/avatar.js'
-import { tint, visibleParts } from './wardrobe.js'
+import { holding, tint, visibleParts } from './wardrobe.js'
 
 describe('visibleParts', () => {
   it('shows the bare figure with hair when nothing is worn', () => {
@@ -15,6 +15,18 @@ describe('visibleParts', () => {
 
   it('keeps the hair when only other slots are filled', () => {
     expect(visibleParts({ chest: itemById('linen-tunic') })).toContain('hair')
+  })
+})
+
+describe('holding', () => {
+  it('closes the right hand around the main weapon and the left around the off hand', () => {
+    expect(holding({ mainHand: itemById('short-sword') })).toEqual(new Set(['r']))
+    expect(holding({ offHand: itemById('wooden-shield') })).toEqual(new Set(['l']))
+    expect(holding(worn([{ id: 'flanged-mace', equipped: true }, { id: 'parrying-dagger', equipped: true }]))).toEqual(new Set(['l', 'r']))
+  })
+
+  it('leaves both hands open without weapons', () => {
+    expect(holding({ gloves: itemById('leather-gloves'), chest: itemById('chain-mail') })).toEqual(new Set())
   })
 })
 
