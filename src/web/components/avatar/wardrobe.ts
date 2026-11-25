@@ -7,6 +7,8 @@ const BARE = ['body', 'eyes', 'eyebrows', 'eyelashes']
 export function visibleParts(worn: Worn): Set<string> {
   const parts = new Set(BARE)
   if (!worn.head) parts.add('hair')
+  if (!worn.chest) parts.add('undershirt')
+  if (!worn.legs) parts.add('shorts')
   for (const item of Object.values(worn)) {
     if (item) parts.add(`item_${item.id}`)
   }

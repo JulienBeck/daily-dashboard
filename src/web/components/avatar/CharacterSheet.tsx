@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
   type Body,
-  BODIES,
   type ItemDef,
   itemById,
   ITEMS,
@@ -12,7 +11,7 @@ import {
   slotLabel,
   worn,
 } from '../../../shared/avatar.js'
-import { getEquipment, setBody, setEquipped } from '../../api.js'
+import { getEquipment, setEquipped } from '../../api.js'
 import { ItemIcon } from './ItemIcon.js'
 import { Stage } from './Stage.js'
 
@@ -73,11 +72,11 @@ export function CharacterSheet({ name }: { name: string }) {
         .filter((entry): entry is { owned: OwnedItem; item: ItemDef } => entry.item?.slot === selected)
     : []
 
-  const save = async (request: () => Promise<{ body: Body; items: OwnedItem[] }>) => {
+  const change = async (id: string, equipped: boolean) => {
     setBusy(true)
     setError(null)
     try {
-      const payload = await request()
+      const payload = await setEquipped(id, equipped)
       setItems(payload.items)
       setBodyState(payload.body)
     } catch (reason: unknown) {
@@ -86,7 +85,6 @@ export function CharacterSheet({ name }: { name: string }) {
       setBusy(false)
     }
   }
-  const change = (id: string, equipped: boolean) => save(() => setEquipped(id, equipped))
 
   const column = (side: 'left' | 'right' | 'bottom') =>
     SLOTS.filter((entry) => entry.column === side).map(({ slot }) => (
@@ -101,24 +99,9 @@ export function CharacterSheet({ name }: { name: string }) {
 
   return (
     <section aria-label="Ausrüstung" className="scroller grid min-h-0 content-start gap-3 pr-1">
-      <div role="radiogroup" aria-label="Körperbau" className="flex justify-center gap-2">
-        {BODIES.map((entry) => (
-          <button
-            key={entry.body}
-            type="button"
-            role="radio"
-            aria-checked={body === entry.body}
-            disabled={busy || !items}
-            onClick={() => body !== entry.body && void save(() => setBody(entry.body))}
-            className="metal-button h-7 px-3 text-[12px] disabled:opacity-50 aria-checked:outline-2 aria-checked:outline-offset-1 aria-checked:outline-accent"
-          >
-            {entry.label}
-          </button>
-        ))}
-      </div>
-      <div className="grid grid-cols-[auto_minmax(0,240px)_auto] items-center justify-center gap-2">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
         <div className="grid gap-2.5">{column('left')}</div>
-        <div className="h-[340px] min-w-0">
+        <div className="h-[max(340px,calc(90vh-7.5rem))] min-w-0">
           <Stage body={body} worn={wearing} title={`Spielfigur von ${name}`} />
         </div>
         <div className="grid gap-2.5">{column('right')}</div>

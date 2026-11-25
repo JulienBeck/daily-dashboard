@@ -3,14 +3,23 @@ import { itemById, worn } from '../../../shared/avatar.js'
 import { holding, tint, visibleParts } from './wardrobe.js'
 
 describe('visibleParts', () => {
-  it('shows the bare figure with hair when nothing is worn', () => {
-    expect(visibleParts({})).toEqual(new Set(['body', 'eyes', 'eyebrows', 'eyelashes', 'hair']))
+  it('shows the figure in its underwear with hair when nothing is worn', () => {
+    expect(visibleParts({})).toEqual(new Set(['body', 'eyes', 'eyebrows', 'eyelashes', 'hair', 'undershirt', 'shorts']))
+  })
+
+  it('takes off the undershirt under a chest piece and the shorts under trousers', () => {
+    expect(visibleParts({ chest: itemById('chain-mail') })).not.toContain('undershirt')
+    expect(visibleParts({ chest: itemById('chain-mail') })).toContain('shorts')
+    expect(visibleParts({ legs: itemById('wool-trousers') })).not.toContain('shorts')
+    expect(visibleParts({ legs: itemById('wool-trousers') })).toContain('undershirt')
   })
 
   it('adds every worn item and hides the hair under a head piece', () => {
     const parts = visibleParts(worn([{ id: 'iron-helm', equipped: true }, { id: 'short-sword', equipped: true }]))
 
-    expect(parts).toEqual(new Set(['body', 'eyes', 'eyebrows', 'eyelashes', 'item_iron-helm', 'item_short-sword']))
+    expect(parts).toEqual(
+      new Set(['body', 'eyes', 'eyebrows', 'eyelashes', 'undershirt', 'shorts', 'item_iron-helm', 'item_short-sword']),
+    )
   })
 
   it('keeps the hair when only other slots are filled', () => {

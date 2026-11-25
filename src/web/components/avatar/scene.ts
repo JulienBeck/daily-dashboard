@@ -13,6 +13,7 @@ import {
   PerspectiveCamera,
   PMREMGenerator,
   Scene,
+  type SkinnedMesh,
   SRGBColorSpace,
   Timer,
   Vector3,
@@ -61,6 +62,20 @@ function paint(root: Object3D) {
   })
 }
 
+const FRAME = 1 / 0.8
+
+function posed(figure: Object3D): Box3 {
+  const body = figure.getObjectByName('body') ?? figure
+  figure.updateMatrixWorld(true)
+  body.traverse((node) => {
+    const mesh = node as SkinnedMesh
+    if (!mesh.isSkinnedMesh) return
+    mesh.skeleton.update()
+    mesh.computeBoundingBox()
+  })
+  return new Box3().setFromObject(body)
+}
+
 export async function createStage(canvas: HTMLCanvasElement, url: string, still: boolean): Promise<Stage> {
   const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true })
   try {
@@ -93,22 +108,6 @@ function stage(renderer: WebGLRenderer, canvas: HTMLCanvasElement, model: Model,
   paint(figure)
   scene.add(figure)
 
-  const bounds = new Box3().setFromObject(figure)
-  const size = bounds.getSize(new Vector3())
-  const centre = bounds.getCenter(new Vector3())
-  const camera = new PerspectiveCamera(22, 1, 0.1, 50)
-  const fit = () => {
-    const width = canvas.clientWidth || 240
-    const height = canvas.clientHeight || 340
-    renderer.setSize(width, height, false)
-    camera.aspect = width / height
-    const distance = Math.max(size.y * 1.08, (size.x * 1.25) / camera.aspect) / (2 * Math.tan((camera.fov * Math.PI) / 360))
-    camera.position.set(centre.x, centre.y + size.y * 0.02, centre.z + distance)
-    camera.lookAt(centre.x, centre.y, centre.z)
-    camera.updateProjectionMatrix()
-  }
-  fit()
-
   const mixer = new AnimationMixer(figure)
   const idle = model.animations.find((clip) => clip.name === 'idle')
   const grip = model.animations.find((clip) => clip.name === 'grip')
@@ -132,6 +131,22 @@ function stage(renderer: WebGLRenderer, canvas: HTMLCanvasElement, model: Model,
     mixer.update(0)
   }
   pose(new Set())
+
+  const bounds = posed(figure)
+  const size = bounds.getSize(new Vector3())
+  const centre = bounds.getCenter(new Vector3())
+  const camera = new PerspectiveCamera(22, 1, 0.1, 50)
+  const fit = () => {
+    const width = canvas.clientWidth || 240
+    const height = canvas.clientHeight || 340
+    renderer.setSize(width, height, false)
+    camera.aspect = width / height
+    const distance = (Math.max(size.y, size.x / camera.aspect) * FRAME) / (2 * Math.tan((camera.fov * Math.PI) / 360))
+    camera.position.set(centre.x, centre.y, centre.z + distance)
+    camera.lookAt(centre.x, centre.y, centre.z)
+    camera.updateProjectionMatrix()
+  }
+  fit()
 
   let turn = 0
   let dragging: number | null = null

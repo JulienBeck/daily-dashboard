@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as api from '../../api.js'
 import { CharacterSheet } from './CharacterSheet.js'
+import { createStage } from './scene.js'
 
 vi.mock('../../api.js')
 vi.mock('./scene.js', () => ({ createStage: vi.fn(() => new Promise(() => undefined)) }))
@@ -34,52 +35,13 @@ describe('CharacterSheet', () => {
     expect(screen.getByRole('button', { name: 'Kopf: Wollkapuze' }).querySelector('[data-item="wool-hood"]')).not.toBeNull()
   })
 
-  it('starts with the body the player chose', async () => {
+  it('shows the body the player has without offering to change it', async () => {
     vi.mocked(api.getEquipment).mockResolvedValue({ body: 'female', items })
     await sheet()
 
-    expect(screen.getByRole('radio', { name: 'Frau' })).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByRole('radio', { name: 'Mann' })).toHaveAttribute('aria-checked', 'false')
-  })
-
-  it('switches the body and keeps the equipment', async () => {
-    vi.mocked(api.setBody).mockResolvedValue({ body: 'female', items })
-    await sheet()
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Frau' }))
-
-    await waitFor(() => expect(screen.getByRole('radio', { name: 'Frau' })).toHaveAttribute('aria-checked', 'true'))
-    expect(api.setBody).toHaveBeenCalledWith('female')
-    expect(screen.getByRole('button', { name: 'Kopf: Wollkapuze' })).toBeInTheDocument()
-  })
-
-  it('switches back to the male body', async () => {
-    vi.mocked(api.getEquipment).mockResolvedValue({ body: 'female', items })
-    vi.mocked(api.setBody).mockResolvedValue({ body: 'male', items })
-    await sheet()
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Mann' }))
-
-    await waitFor(() => expect(screen.getByRole('radio', { name: 'Mann' })).toHaveAttribute('aria-checked', 'true'))
-    expect(api.setBody).toHaveBeenCalledWith('male')
-  })
-
-  it('does not ask again for the body already chosen', async () => {
-    await sheet()
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Mann' }))
-
-    expect(api.setBody).not.toHaveBeenCalled()
-  })
-
-  it('shows why the body could not be changed', async () => {
-    vi.mocked(api.setBody).mockRejectedValue(new Error('Körperbau: Mann oder Frau?'))
-    await sheet()
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Frau' }))
-
-    expect(await screen.findByText('Ausrüstung: Körperbau: Mann oder Frau?')).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: 'Mann' })).toHaveAttribute('aria-checked', 'true')
+    await waitFor(() => expect(createStage).toHaveBeenLastCalledWith(expect.anything(), '/avatar/female.glb', false))
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument()
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument()
   })
 
   it('opens the choice for a slot and closes it on a second click', async () => {

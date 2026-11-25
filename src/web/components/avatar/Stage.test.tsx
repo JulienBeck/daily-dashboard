@@ -23,7 +23,7 @@ describe('Stage', () => {
     await waitFor(() => expect(stage.show).toHaveBeenCalled())
     expect(vi.mocked(createStage).mock.calls[0]![1]).toBe('/avatar/female.glb')
     expect(vi.mocked(createStage).mock.calls[0]![2]).toBe(false)
-    expect(stage.show).toHaveBeenLastCalledWith(new Set(['body', 'eyes', 'eyebrows', 'eyelashes', 'item_iron-helm']), new Set())
+    expect(stage.show).toHaveBeenLastCalledWith(new Set(['body', 'eyes', 'eyebrows', 'eyelashes', 'undershirt', 'shorts', 'item_iron-helm']), new Set())
     expect(screen.queryByText('Figur wird geladen …')).not.toBeInTheDocument()
   })
 
@@ -49,7 +49,7 @@ describe('Stage', () => {
     rerender(<Stage body="male" worn={{ chest: itemById('chain-mail') }} title="x" />)
 
     await waitFor(() => expect(stage.show).toHaveBeenCalledTimes(2))
-    expect(stage.show).toHaveBeenLastCalledWith(new Set(['body', 'eyes', 'eyebrows', 'eyelashes', 'hair', 'item_chain-mail']), new Set())
+    expect(stage.show).toHaveBeenLastCalledWith(new Set(['body', 'eyes', 'eyebrows', 'eyelashes', 'hair', 'shorts', 'item_chain-mail']), new Set())
     expect(createStage).toHaveBeenCalledTimes(1)
   })
 
